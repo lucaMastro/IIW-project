@@ -10,7 +10,7 @@
 
 extern int h_errno;
 
-void client_put_operation(int sockfd){
+void client_put_operation(int cmd_sock, int data_sock){
 	char *file_to_send, *complete_path;
 	int res_scan;
 	int len = strlen(CLIENT_FOLDER);
@@ -56,7 +56,7 @@ void client_put_operation(int sockfd){
 
 
 	//invio comando: invio solo il nome del file, non l'intero apth
-	if (send_data(sockfd, file_to_send, (PUT | CHAR_INDICATOR)) < 0){
+	if (send_data(cmd_sock, file_to_send, (PUT | CHAR_INDICATOR)) < 0){
 		perror("errore in write");
 		exit(1);
 	}
@@ -64,7 +64,7 @@ void client_put_operation(int sockfd){
 	FILE *segment_file_transfert;
 	segment_file_transfert = fopen(complete_path, "rb"); // la b sta per binario, sennò la fread non funziona
 					
-	if (send_data(sockfd, segment_file_transfert, 0) < 0){
+	if (send_data(data_sock, segment_file_transfert, 0) < 0){
 		perror("errore in sendto");
 		exit(1);
 	}
@@ -74,7 +74,7 @@ void client_put_operation(int sockfd){
 
 
 
-void client_get_operation(int sockfd){
+void client_get_operation(int cmd_sock, int data_sock){
 
 	char *file_to_get;
 	char *complete_path;
@@ -126,13 +126,13 @@ void client_get_operation(int sockfd){
 	}	
 
 	//invio comando con nome
-	if (send_data(sockfd, file_to_get, GET | CHAR_INDICATOR) < 0){
+	if (send_data(cmd_sock, file_to_get, GET | CHAR_INDICATOR) < 0){
 		perror("errore in sendto");
 		exit(1);
 	}
 
 	//ricevi messaggi	
-	int n = receive_data(sockfd, new_file, NULL);
+	int n = receive_data(data_sock, new_file, NULL);
 	if (n < 0) {
 		perror("errore in thread_recvfrom");
 		exit(1);	
@@ -145,12 +145,12 @@ void client_get_operation(int sockfd){
 
 
 
-void client_list_operation(int sockfd){
+void client_list_operation(int cmd_sock, int data_sock){
 
 	//faccio partire timer 
-	//setsockopt(new_sockfd,SOL_SOCKET,SO_RCVTIMEO,(char*)&timeout,sizeof(struct timeval));
+	//setsockopt(new_cmd_sock,SOL_SOCKET,SO_RCVTIMEO,(char*)&timeout,sizeof(struct timeval));
 
-	if (send_data(sockfd, NULL, LIST) < 0){
+	if (send_data(cmd_sock, NULL, LIST) < 0){
 		perror("errore in sendto");
 		exit(1);
 	}
@@ -159,7 +159,7 @@ void client_list_operation(int sockfd){
 	//attesa di ack + data
 	unsigned char *list = NULL;
 
-	if (receive_data(sockfd, &list, NULL ) < 0) {
+	if (receive_data(data_sock, &list, NULL ) < 0) {
 		perror("errore in recvfrom");
 		exit(1);
 	}

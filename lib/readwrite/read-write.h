@@ -6,58 +6,13 @@
 #include <string.h>
 #include "../serialize/deserialize.h"
 #include "../serialize/serialize.h"
-#include "../functions/packet_queue_manager.h"
+#include "../passive-functions/passive-functions.h"
 #include <sys/time.h>
 
 
-void write_on_string(Message *mex, unsigned char **dest, int *old_str_len,
-		int *str_len, unsigned char *src, Queue_manager *receive_queue, uint16_t *flag);
-int is_command_message(Message *cmd);
-void write_on_file(unsigned char *src, Message *mex, FILE *opened_stream, Queue_manager *receive_queue, uint16_t *flag);
-
-void stampa_mess(Message *mex){
-	printf("\nMessage:\n");
-	printf("seq_num: %u\n", mex -> seq_num);
-	printf("ack_num: %u\n", mex -> ack_num);
-	printf("flag:    %u\n", mex -> flag);
-	printf("rec_win: %u\n", mex -> rec_win);
-	printf("length:  %u\n", mex -> length);
-	
-/*	if ((mex -> flag & CHAR_INDICATOR) == CHAR_INDICATOR)
-		printf("data:    %s\n", mex -> list_data);*/
-}
+void write_data(Message *mex, void *dest, unsigned char *src, int *str_len, int *old_str_len);
 
 
-/*	readn legge esattamente n byte	*/
-ssize_t readn(int fd, size_t n, struct sockaddr_in *from, unsigned char *buff){
-	size_t nleft = n;
-	size_t nread;
-	unsigned char *ptr;
-
-	ptr = buff;
-	while(nleft > 0){
-		if (from != NULL) {
-			socklen_t len = sizeof(*from);
-			nread = recvfrom(fd, ptr, n, 0,(struct sockaddr*) from, &len);
-		}
-		else
-			nread = recvfrom(fd, ptr, n, 0, NULL, NULL);
-
-		if ( nread < 0 ){
-			if (errno == EINTR)
-				nread = 0;
-			else
-				return -1;
-		}
-		else if (nread == 0)
-			break;
-
-		nleft -= nread;
-		ptr += nread;
-	}
-	return nleft;
-
-}
 
 
 /*	scrive esattamente n byte	*/
@@ -88,79 +43,190 @@ ssize_t writen(int fd, ssize_t n, struct sockaddr_in *to, unsigned char *buff){
 }	
 
 
-
-void *make_packet(Message *mess, FILE *file, unsigned char *data_char, int type, int *seq_num){
+void *make_packet(Message *mess_to_fill, void *read_data_from_here, int flag_to_set){
 
 	int bytes_read;
 
-	mess -> seq_num = *seq_num;
-	mess -> ack_num = 0;
-	mess -> flag = type;
-	//mess -> new_port = 0;
-	mess -> rec_win = 0;
+	mess_to_fill -> seq_num = 0;
+	mess_to_fill -> ack_num = 0;
+	mess_to_fill -> flag = flag_to_set;
 	void* return_addr = NULL;
 	int min;
 
-	if (file != NULL || data_char != NULL){
-		if ( !(CHAR_INDICATOR & type) ){
-			bytes_read = fread(mess -> list_data, 1, MSS, file);
-			mess -> length = bytes_read;
+	if (read_data_from_here != NULL){
+		if ( !(CHAR_INDICATOR & flag_to_set) ){
+			bytes_read = fread(mess_to_fill -> list_data, 1, MSS, (FILE*) read_data_from_here);
+			mess_to_fill -> length = bytes_read;
 		}
 		else{
-			if ( strlen((char*)data_char) < MSS)
-				min = strlen((char*)data_char);
+			int str_len = strlen((char*)read_data_from_here);
+			min = str_len < MSS ? str_len : MSS;
+	/*		if (str_len < MSS)
+				min = str_len;
 			else
-				min = MSS;
+				min = MSS;*/
 
-			mess -> length = min;
-			//strcpy((char*) mess -> list_data, (char*) data_char);
-			memcpy(mess -> list_data, data_char, mess -> length);
-			return_addr = data_char + min;
-			//printf("imess -> list_data %s\n", mess -> list_data);
+			mess_to_fill -> length = min;
+			memcpy(mess_to_fill -> list_data, (unsigned char*) read_data_from_here, mess_to_fill -> length);
+			//in questo caso ritorno la posizione della stringa da cui continuare a leggere
+			return_addr = (unsigned char*)read_data_from_here + min;
 		}
 	}
 	else
-		mess -> length = 0;
+		mess_to_fill -> length = 0;
 
-	if (mess -> length < MSS)
-		mess -> flag += END_OF_DATA;
+	if (mess_to_fill -> length < MSS)
+		mess_to_fill -> flag += END_OF_DATA;
 
 	return return_addr;
 }
 
 
-ssize_t send_data(int fd, FILE *file_to_send, unsigned char *data_char, struct sockaddr_in *to, int type){
+
+ssize_t send_data(int connected_fd, void *data, int type){
 	ssize_t bytes_sent = 0;
 	int len_ser = HEADER_SIZE;
-	unsigned char *tmp;
-	int seq_num = 1;
+	unsigned char *tmp, *new_data_pointer = (unsigned char*) data;
 	Message mex;
-	
-	Message mex_ritardato;
 
+	mex.length = 0;
 	mex.flag = type;
 	do{
 		memset((void*) mex.list_data, 0, MSS);
+		
+		if (data != NULL){
+			if ( (type & CHAR_INDICATOR) == CHAR_INDICATOR)
+				new_data_pointer = (unsigned char *) make_packet(&mex, new_data_pointer, type);
+			else
+				make_packet(&mex, data, type);
+		}
+
+		if (mex.length == 0)
+			mex.flag = mex.flag | END_OF_DATA;
+
+		len_ser += mex.length;
+		//printf("len ser = %d\n", len_ser);
+		unsigned char *packet_ser = (unsigned char*) malloc(sizeof(unsigned char) * len_ser);
+		if (packet_ser == NULL){
+			perror("error in malloc");
+			exit(EXIT_FAILURE);
+		}
+		tmp = serialize_header(&mex, packet_ser);
+		memcpy(tmp, mex.list_data, mex.length);
+
+		bytes_sent += write(connected_fd, packet_ser, len_ser);
+		
+		free(packet_ser);
+		len_ser = HEADER_SIZE;
+
+	} //while(mex.length == MSS);
+	while( (mex.flag & END_OF_DATA) != END_OF_DATA ); //quando è == 1 ho inviato l'ultimo	
+
+	return bytes_sent;
+}
+
+
+ssize_t receive_data(int connected_sockfd, void *write_here, 
+		int *save_here_flag){
+
+	int max_size = HEADER_SIZE + MSS;
+	ssize_t n_read;
+	int str_len = 0;
+	int old_str_len;
+	uint16_t flag;
+	uint8_t expected_seq_num = 0;
+	unsigned char *tmp;
+	unsigned char *serialized = (unsigned char *) malloc(sizeof(char) * max_size);
+	if (serialized == NULL){
+		perror("error in malloc");
+		exit(EXIT_FAILURE);
+	}
+	memset((void*) serialized, 0, max_size);
+	
+	do {
+		//leggo
+		if ( (n_read = read(connected_sockfd, serialized, max_size)) < 0){
+			perror("error in read");
+			exit(EXIT_FAILURE);
+		}
+
+		//alloco la struttura
+		Message *mex = (Message *) malloc(sizeof(Message));
+		if (mex == NULL){
+			perror("error in malloc");
+			exit(EXIT_FAILURE);
+		}
+		//fillo la struttura
+		tmp = deserialize_header(mex, serialized);
+		//stampa_mess(mex);
+
+		//printf("\n\n temp %s\n\n\n", tmp);
+		//salvo flag per il controllo del ciclo
+		flag = mex -> flag;
+
+		//salvo flag per il controllo a serverside
+		if (save_here_flag != NULL )
+			*save_here_flag = flag;
+
+			
+		//è possibile che arrivino pacchetti con solo header
+		if (mex -> length > 0){
+			
+			//devo scrivere solo se è il seq_num atteso:
+			if (mex -> seq_num == expected_seq_num){
+				write_data(mex, write_here, tmp, &str_len, &old_str_len);
+			}
+			
+		}
+	}
+	//esco quando ho ricevuto l'ultimo pacchetto e non ho niente bufferizzato
+
+	while ((flag & END_OF_DATA) != END_OF_DATA);
+	free(serialized);
 
 		
+	return n_read;
+
+}
+
+
+void write_data(Message *mex, void *dest, unsigned char *src, int *str_len, int *old_str_len){
+	//check sul flag
+	if ( (mex -> flag & CHAR_INDICATOR) != 0){
+
+		*old_str_len = *str_len;
+		*str_len += mex -> length;
+
+		unsigned char **str_dest = (unsigned char **) dest;  //necessario perché un messaggio stringa potrebbe essere diviso in 2 pacchetti
+		*str_dest = (unsigned char*) realloc(*str_dest, (*str_len + 1));
+		if (*str_dest == NULL){
+			perror("error in malloc");
+			exit(EXIT_FAILURE);	
+		}
+		memcpy( (*str_dest) + (*old_str_len), src, mex -> length);
+		*(*str_dest + *str_len) = '\0';
+	}
+	else{
+		fwrite(src, 1, mex -> length, (FILE *) dest);
+	}
+
+	free(mex);
+}
+
+ssize_t send_unconnected(int fd, FILE *file_to_send, unsigned char *data_char, struct sockaddr_in *to, int type){
+	ssize_t bytes_sent = 0;
+	int len_ser = HEADER_SIZE;
+	unsigned char *tmp;
+
+	Message mex;
+	
+	do{
+		memset((void*) mex.list_data, 0, MSS);
 		if (data_char == NULL)
-			make_packet(&mex, file_to_send, NULL, type, &seq_num);
+			make_packet(&mex, file_to_send, type);
 		else
-			data_char = (unsigned char*) make_packet(&mex, NULL, data_char, (CHAR_INDICATOR | type), &seq_num);
+			data_char = (unsigned char*) make_packet(&mex, data_char, (CHAR_INDICATOR | type));
 		
-		if (is_command_message(&mex)){
-			seq_num = 0;
-		}
-
-		mex.seq_num = seq_num;
-		
-		if (mex.seq_num == 1){
-			mex_ritardato = mex;
-			seq_num += mex.length;
-			continue;
-		}
-
-
 		len_ser += mex.length;
 		unsigned char *packet_ser = (unsigned char*) malloc(sizeof(unsigned char) * len_ser);
 		if (packet_ser == NULL){
@@ -177,8 +243,6 @@ ssize_t send_data(int fd, FILE *file_to_send, unsigned char *data_char, struct s
 		bytes_sent += writen(fd, len_ser, to, packet_ser);	
 		//printf("bytes sent = %lu\n", bytes_sent);
 		//printf("flag = %u\n\n", mex.flag);
-		
-		seq_num += mex.length;
 
 		free(packet_ser);
 		len_ser = HEADER_SIZE;
@@ -186,44 +250,15 @@ ssize_t send_data(int fd, FILE *file_to_send, unsigned char *data_char, struct s
 	} //while(mex.length == MSS);
 	while( (mex.flag & END_OF_DATA) != END_OF_DATA ); //quando è == 1 ho inviato l'ultimo
 	
-
-	if (file_to_send != NULL){
-		printf("PACCHETTO RITARDATO\n");
-
-		len_ser += mex_ritardato.length;
-		unsigned char *packet_ser = (unsigned char*) malloc(sizeof(unsigned char) * len_ser);
-		if (packet_ser == NULL){
-			perror("error in malloc");
-			exit(EXIT_FAILURE);
-		}
-		tmp = serialize_header(&mex_ritardato, packet_ser);
-		memcpy(tmp, mex_ritardato.list_data, mex_ritardato.length);
-		
-		/*if (data_char != NULL){
-			printf("datachar = %s\ntmp[data] = %s\n", data_char, tmp);
-		}*/
-
-		bytes_sent += writen(fd, len_ser, to, packet_ser);	
-		//printf("bytes sent = %lu\n", bytes_sent);
-		//printf("flag = %u\n\n", mex.flag);
-		
-		seq_num += mex.length;
-
-		free(packet_ser);
-	}
-
+	printf("bytes sent = %lu\n", bytes_sent);
 	return bytes_sent;
 }
 
-
-
-ssize_t receive_data(int fd, FILE *write_here, unsigned char **write_string_here, struct sockaddr_in *from, int *save_here_flag){
-
+size_t receive_unconnected(int fd, FILE *write_here, unsigned char **write_string_here, struct sockaddr_in *from, int *save_here_flag){
 	int max_size = HEADER_SIZE + MSS;
 	ssize_t n_read;
 	int str_len = 0;
 	int old_str_len;
-	uint16_t flag = 0;
 	unsigned char *tmp;
 	unsigned char *serialized = (unsigned char *) malloc(sizeof(char) * max_size);
 	if (serialized == NULL){
@@ -231,16 +266,10 @@ ssize_t receive_data(int fd, FILE *write_here, unsigned char **write_string_here
 		exit(EXIT_FAILURE);
 	}
 	memset((void*) serialized, 0, max_size);
-
-
-	Queue_manager receive_queue;
-	receive_queue.cur_starting_pos = 0;
-	receive_queue.queue = create_queue();
-	receive_queue.free_bytes = MSS * QUEUE_SIZE;
-	receive_queue.expected_seq_num = 1; 	
+	
+	Message mex;
 	
 	do {
-		//leggo
 		if (from != NULL){
 			socklen_t len = sizeof(*from);
 			n_read = recvfrom(fd, serialized, max_size, 0, (struct sockaddr*)from, &len);
@@ -248,145 +277,37 @@ ssize_t receive_data(int fd, FILE *write_here, unsigned char **write_string_here
 		else
 			n_read = recvfrom(fd, serialized, max_size, 0, NULL, NULL);
 
-		//alloco la struttura
-		Message *mex = (Message *) malloc(sizeof(Message));
-		if (mex == NULL){
-			perror("error in malloc");
-			exit(EXIT_FAILURE);
-		}
-		//fillo la struttura
-		tmp = deserialize_header(mex, serialized);
-			
-		//salvo il flag nella variabile per check di uscita
-		//flag = mex -> flag; viene aggiornato quando scrivo dalla funzione
-		//quando bufferizzo non devo mai uscire: devo aspettare un pacchetto mancante
-		//quindi non ha senso aggiornarlo quando bufferizzo
+		tmp = deserialize_header(&mex, serialized);
 
-		//salvo flag per il controllo a serverside
-		if (save_here_flag != NULL )
-			*save_here_flag = mex -> flag;
+		//printf("received flag = %u\n", mex.flag);
+		if (save_here_flag != NULL)
+			*save_here_flag = mex.flag;
 
-		//gestione messaggi di comando
-		//if (is_command_message(mex)){
-		if (mex -> seq_num == 0){
-	
-			//cmd mex hanno solo campi di tipo string, se ce l'hanno
-			if (mex -> length > 0){
-				write_on_string(mex, write_string_here, &old_str_len,
-						 &str_len, tmp, &receive_queue, &flag);
-			}
-			//i nomi dei file sono limitati a un mss
-			return n_read;
-		}
-
-			
-		//è possibile che arrivino pacchetti con solo header
-		if (mex -> length > 0){
-			
-			//devo scrivere solo se è il seq_num atteso:
-			if (mex -> seq_num == receive_queue.expected_seq_num){
-
-				//printf("lo scrivo. ftell = %ld\n", ftell(write_here));
-
-				if ( (mex -> flag & CHAR_INDICATOR) == CHAR_INDICATOR){
-					//writestring			
-					write_on_string(mex, write_string_here, &old_str_len,
-						 &str_len, tmp, &receive_queue, &flag);
-					
-
-					//scorro sulla lista e scrivo i dati
-					//mex è stato freedato
-					while ((mex = receive_queue.queue[receive_queue.cur_starting_pos]) 
-							!= NULL){
-							
-						write_on_string(mex, write_string_here, &old_str_len,
-							 &str_len, mex -> list_data, &receive_queue, &flag);
-					}
-				}
-				else{
-
-
-					write_on_file(tmp, mex, write_here, &receive_queue, &flag);
-					//scorro sulla lista e scrivo i dati
-					int pos = receive_queue.cur_starting_pos;
-					while ( (mex = receive_queue.queue[pos]) != NULL){
-						write_on_file(mex -> list_data, mex, write_here, &receive_queue, &flag);
-						pos = (pos + 1) % QUEUE_SIZE;
-						receive_queue.cur_starting_pos = pos;
-
-					}
-				}						
-
-			}
-			
-			//pacchetto fuori ordine: va bufferizzato
-			else{
-
-
-				int offset = (mex -> seq_num - 1)/MSS;
-				offset--;
-				offset = offset % QUEUE_SIZE;
-						
-				//devo copiare tmp nel campo data del pacchetto:
-				/*mex -> list_data = (unsigned char*) malloc(sizeof(unsigned char) * mex -> length);
-				if (mex -> list_data == NULL){
+		if (mex.length > 0){
+			if ( (mex.flag & CHAR_INDICATOR) == CHAR_INDICATOR){
+				old_str_len = str_len;
+				str_len += mex.length;
+				
+				*write_string_here = (unsigned char*) realloc(*write_string_here, str_len);
+				if (*write_string_here == NULL){
 					perror("error in malloc");
 					exit(EXIT_FAILURE);
-				}*/
-				memcpy(mex -> list_data, tmp, mex -> length);
+				}
 
-				receive_queue.queue[offset] = mex;
-				receive_queue.free_bytes -= mex -> length;
-			}	
+				//strcpy((char*) write_string_here, (char *)tmp);	
+				//printf("tmp = %s\n", tmp);
+				memcpy(*write_string_here + old_str_len, tmp, mex.length);
+			}
+			else
+				fwrite(tmp, 1, mex.length, write_here);
+			
 		}
 	}
-	//esco quando ho ricevuto l'ultimo pacchetto e non ho niente bufferizzato
+	//while(n_read == max_size);
+	while ((mex.flag & END_OF_DATA) != END_OF_DATA);
 
-	while ((flag & END_OF_DATA) != END_OF_DATA || 
-			receive_queue.queue[receive_queue.cur_starting_pos] != NULL); 
-
-	free(receive_queue.queue);
-		
+	printf("exited\n");
+	
 	return n_read;
 
-}
-
-
-int is_command_message(Message *cmd){
-	return (PUT | GET | LIST | FIN | SYN | SYN_ACK | ACK) & (cmd -> flag);
-}
-
-
-
-void write_on_string(Message *mex, unsigned char **dest, int *old_str_len,
-		int *str_len, unsigned char *src, Queue_manager *receive_queue, uint16_t *flag){
-
-	*old_str_len = *str_len;
-	*str_len += mex -> length;
-
-	*dest = (unsigned char*) realloc(*dest, *str_len);
-	if (*dest == NULL){
-		perror("error in malloc");
-		exit(EXIT_FAILURE);	
-	}
-
-	memcpy(*dest + *old_str_len, src, mex -> length);
-					
-	//aggiorno seq_num atteso
-	receive_queue -> expected_seq_num = mex -> seq_num + mex -> length;
-	*flag = mex -> flag;
-
-	free(mex);
-
-}
-
-void write_on_file(unsigned char *src, Message *mex, FILE *opened_stream, Queue_manager *receive_queue, uint16_t *flag){
-	fwrite(src, 1, mex -> length, opened_stream);
-
-	//aggiorno seq_num atteso
-	receive_queue -> expected_seq_num = mex -> seq_num + mex -> length;
-
-	*flag = mex -> flag;
-
-	free(mex);
 }

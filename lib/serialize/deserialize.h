@@ -2,16 +2,17 @@
 #include <stdlib.h>
 #include <string.h>
 
-unsigned char *deserialize_seq_num(Message *mex, unsigned char *buffer){
-	memcpy(&(mex -> seq_num), buffer,4);
 
-	return buffer + 4;
+unsigned char *deserialize_seq_num(Message *mex, unsigned char *buffer){
+	memcpy(&(mex -> seq_num), buffer,1);
+
+	return buffer + 1;
 }
 
 unsigned char *deserialize_ack_num(Message *mex, unsigned char *buffer){
-	memcpy(&(mex -> ack_num), buffer,  4);
+	memcpy(&(mex -> ack_num), buffer,  1);
 
-	return buffer + 4;
+	return buffer + 1;
 }
 
 unsigned char *deserialize_flag(Message *mex,unsigned char *buffer){
@@ -19,31 +20,16 @@ unsigned char *deserialize_flag(Message *mex,unsigned char *buffer){
 	return buffer + 2;
 }
 
-/*
-unsigned char *deserialize_new_port(Message *mex,unsigned char *buffer){
-	memcpy(&(mex -> new_port), buffer, 2);
-
-	return buffer + 2;
-}*/
-
-unsigned char *deserialize_rec_win(Message *mex,unsigned char *buffer){
-	memcpy(&(mex -> rec_win), buffer, 2);
-
-	return buffer + 2;
-}
-
 unsigned char *deserialize_length(Message *mex,unsigned char *buffer){
-	memcpy(&(mex -> length), buffer, 4);
+	memcpy(&(mex -> length), buffer, 2);
 
-	return buffer + 4;
+	return buffer + 2;
 }
 
 unsigned char *deserialize_header(Message *mex,unsigned char *buffer){
 	buffer = deserialize_seq_num(mex, buffer);
 	buffer = deserialize_ack_num(mex, buffer);
 	buffer = deserialize_flag(mex, buffer);
-//	buffer = deserialize_new_port(mex, buffer);
-	buffer = deserialize_rec_win(mex, buffer);
 	buffer = deserialize_length(mex, buffer);
 
 	return buffer;
@@ -62,7 +48,7 @@ Message *deserialize_data(Message *mex, unsigned char *buffer){
 	}
 //	}
 //	else{ //char indicator turned off
-		/*unsigned i;
+		unsigned i;
 		size_t size = mex -> length;
 		for (i = 0; i < size; i++){
 			if (fputc(buffer[i], mex -> file_data) == EOF){

@@ -21,15 +21,17 @@ int check_for_existing_file(int semaphore, char *path,
 	sops.sem_op = -1;
 
 	len += strlen(path);
-	complete_path = (char*) malloc(sizeof(char) * len);
+
+	complete_path = (char*) malloc(sizeof(char) * (len + 1));
 	if (complete_path == NULL){
 		perror("error in malloc");
 		exit(EXIT_FAILURE);
 	}
-	memset((void*) complete_path, 0, len);
+	memset((void*) complete_path, 0, len + 1);
 	strcat(complete_path, SERVER_FOLDER);
 	strcat(complete_path, path);
 	printf("%s\n", complete_path);
+	
 
 	if (semop(semaphore, &sops, 1) == -1){
 		perror("error in getting coin");
@@ -70,7 +72,7 @@ int check_for_existing_file(int semaphore, char *path,
 	return 0;
 }
 
-void server_put_operation(int sockfd, char *file_name, int sem_id){
+void server_put_operation(int cmd_sock, int data_sock, char *file_name, int sem_id){
 
 	int n;
 	FILE *file_received;
@@ -83,7 +85,7 @@ void server_put_operation(int sockfd, char *file_name, int sem_id){
 		exit(EXIT_FAILURE);	
 	}
 
-	n = receive_data(sockfd, file_received, NULL);
+	n = receive_data(data_sock, file_received, NULL);
 	if (n < 0) {
 		perror("errore in thread_recvfrom");
 		exit(EXIT_FAILURE);	
@@ -91,10 +93,10 @@ void server_put_operation(int sockfd, char *file_name, int sem_id){
 	fclose(file_received);
 }
 
-void server_get_operation(int sockfd, char *file_requested){
+void server_get_operation(int cmd_sock, int data_sock, char *file_requested){
 	
 	char *complete_path;
-	int len = strlen(SERVER_FOLDER) + strlen(file_requested);
+	int len = strlen(SERVER_FOLDER) + strlen(file_requested) + 1;
 
 	complete_path = (char *) malloc(sizeof(char) * len);
 	if (complete_path == NULL){
@@ -123,7 +125,7 @@ void server_get_operation(int sockfd, char *file_requested){
 	FILE *file_to_send;
 	file_to_send = fopen(complete_path, "rb"); 
 
-	if (send_data(sockfd, file_to_send, 0) < 0){
+	if (send_data(data_sock, file_to_send, 0) < 0){
 		perror("errore in sendto");
 		exit(EXIT_FAILURE);
 	}
@@ -173,10 +175,10 @@ char *make_file_list(){
 }
 
 
-void server_list_operation(int sockfd){
+void server_list_operation(int cmd_sock, int data_sock){
 	char *file_list = make_file_list();
 	
 	printf("file list = %s\n", file_list);
-	send_data(sockfd, file_list, CHAR_INDICATOR);
+	send_data(data_sock, file_list, CHAR_INDICATOR);
 	free(file_list);
 }

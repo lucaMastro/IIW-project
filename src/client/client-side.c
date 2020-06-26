@@ -8,16 +8,18 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
+#include "../../lib/readwrite/read-write.h"
+#include "../../lib/active_functions/client_operations.h"
+
 #define SERV_PORT   5193 
 #define TIMER 		2
+//#define CLIENT_FOLDER "src/server/server-files/"
 
-#include "../../lib/readwrite/read-write.h"
 
 
 int main(int argc, char *argv[ ]) {
-	int sockfd, new_sockfd;
-	struct sockaddr_in servaddr, new_serveraddr;
-	Message *syn_request, *new_message, *ack;
+	int sockfd, cmd_sock, data_sock;
+	struct sockaddr_in servaddr, cmd_server_addr, data_server_addr;
 	int command;
 
 	if (argc != 2) { /* controlla numero degli argomenti */
@@ -40,72 +42,92 @@ int main(int argc, char *argv[ ]) {
 	}
 
 	/*	invio di syn	*/
-	if (send_data(sockfd, NULL, NULL, &servaddr, SYN) < 0){
+	if (send_unconnected(sockfd, NULL, NULL, &servaddr, SYN) < 1){
 		perror("errore in sendto");
 		exit(EXIT_FAILURE);
 	}
 
-	socklen_t size = sizeof(servaddr);
-	if (connect(sockfd, (struct sockaddr *)&servaddr, size) < 0){
-		perror("error in malloc");
-		exit(EXIT_FAILURE);
-	}
 
 	while(1){
 		//in attesa di SYN ACK, ovvero in attesa del nuovo numero di porta
 		unsigned char *new_port = NULL;
-		if (receive_data(sockfd, NULL, &new_port, NULL, NULL) < 0) {
+		char *tmp;
+		if (receive_unconnected(sockfd, NULL, &new_port, NULL, NULL) < 0) {
 			perror("errore in recvfrom");
 			exit(1);
 		}
 		printf("new_port = %s\n", new_port);
 
-		int new_port_num = atoi((char*)new_port);
+		//gestione delle due porte:
+		tmp = strtok((char*)new_port, " ");
+		int cmd_port = atoi(tmp);
+		
+		tmp = strtok(NULL, " ");
+		int data_port = atoi( tmp);
+
+		printf("port int: %d, %d\n", cmd_port, data_port);
+
 		free(new_port);
 
-		/*	ricevuto il pacchetto, bisogna controllare se il flag di syn-ack
-		 *	è attivo. se non lo è, scarta il pacchetto, se lo è, quel 
-		 *	pacchetto conterrà nel campo data il nuovo numero di porta del 
-		 *	server su cui devo inviare ack. per questo motivo devo chiamare
-		 *	atoi() sul campo data. */
-
-		/*	probabilmente è necessario un check sul flag	*/
-
-		//invio ack su nuova porta, quindi creo nuova socket e una nuova struttura addr
-		if ((new_sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+		//invio ack
+		if ((cmd_sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
 			perror("errore in socket");
 			exit(EXIT_FAILURE);
 		}
-		memset((void *)&new_serveraddr, 0, sizeof(new_serveraddr)); 
-		new_serveraddr.sin_family = AF_INET;
-		new_serveraddr.sin_port = htons(new_port_num);//porta presa dal mess
+		memset((void *)&cmd_server_addr, 0, sizeof(cmd_server_addr)); 
+		cmd_server_addr.sin_family = AF_INET;
+		cmd_server_addr.sin_port = htons(cmd_port);//porta presa dal mess
 
-		if (inet_pton(AF_INET, argv[1], &new_serveraddr.sin_addr) <= 0) {
+		if (inet_pton(AF_INET, argv[1], &cmd_server_addr.sin_addr) <= 0) {
 			/* inet_pton (p=presentation) vale anche per indirizzi IPv6 */
 			fprintf(stderr, "errore in inet_pton per %s", argv[1]);
 			exit(1);
 		}
 
-		//devo dare tempo al thread di generarsi, problema di sincronizzazione!!!!
-		sleep(1);
+		//devo dare tempo al thread di generarsi
+		sleep(0.5);
 
-		//if (writemess(new_sockfd, ack, &new_serveraddr) < 0){
-		if (send_data(new_sockfd, NULL, NULL, &new_serveraddr, ACK) < 0){
+		if (send_unconnected(cmd_sock, NULL, NULL, &cmd_server_addr, ACK) < 0){
 			perror("errore in sendto");
 			exit(1);
 		}
 
-		//connect?
+		socklen_t size = sizeof(servaddr);
+		if (connect(cmd_sock, (struct sockaddr *)&cmd_server_addr, size) < 0){
+			perror("error in malloc");
+			exit(EXIT_FAILURE);
+		}
 
-	/*	Message *command_message = malloc(sizeof(Message)); 
-		Message *data_msg = malloc(sizeof(Message));*/
+		close(sockfd);
+		printf("connected\n");
 
-		char *file_upload = (char *)malloc(100*sizeof(char));
-		char *file_download = (char *)malloc(100*sizeof(char));
-		struct stat st;
-		struct timeval timeout = {TIMER,0}; //set timeout for 2 seconds
-		int w_tx = 1;
-		int *save_flag = (int *) malloc(sizeof(4));
+		//connecting data_sock
+		if ((data_sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+			perror("errore in socket");
+			exit(EXIT_FAILURE);
+		}
+		memset((void *)&data_server_addr, 0, sizeof(data_server_addr)); 
+		data_server_addr.sin_family = AF_INET;
+		data_server_addr.sin_port = htons(data_port);//porta presa dal mess
+
+		if (inet_pton(AF_INET, argv[1], &data_server_addr.sin_addr) <= 0) {
+			/* inet_pton (p=presentation) vale anche per indirizzi IPv6 */
+			fprintf(stderr, "errore in inet_pton per %s", argv[1]);
+			exit(1);
+		}
+
+		sleep(0.5);
+		if (send_unconnected(data_sock, NULL, NULL, &data_server_addr, ACK) < 0){
+			perror("errore in sendto");
+			exit(1);
+		}
+
+		if (connect(data_sock, (struct sockaddr *)&data_server_addr, size) < 0){
+			perror("error in malloc");
+			exit(EXIT_FAILURE);
+		}
+
+	//	struct timeval timeout = {TIMER,0}; //set timeout for 2 seconds
 
 		//invio comandi:
 		while(1){
@@ -117,116 +139,24 @@ int main(int argc, char *argv[ ]) {
 
 				//list case
 				case 1:
-					
-					//faccio partire timer 
-					//setsockopt(new_sockfd,SOL_SOCKET,SO_RCVTIMEO,(char*)&timeout,sizeof(struct timeval));
-
-					if (send_data(new_sockfd, NULL, NULL, &new_serveraddr, LIST) < 0){
-						perror("errore in sendto");
-						exit(1);
-					}
-
-					printf("in attesa di ack + data\n");
-
-					//attesa di ack + data
-					unsigned char *list = NULL;
-
-					if (receive_data(new_sockfd, NULL, &list, NULL, save_flag) < 0) {
-						perror("errore in recvfrom");
-						exit(1);
-					}
-
-					if(*save_flag == ACK){
-
-						printf("ricevuto ack\n");
-					}
-
-
-					//stampo contenuto
-					 printf("list message content:\n%s\n", list);
-					 free(list);
-					 break;
+					client_list_operation(cmd_sock, data_sock);
+					break;
 
 				//get case
 				case 2:
 
-					printf("Which file you want to download ?\n");
-					scanf("%s", file_download);
-
-					//controllo se non è già presente nel client
-
-					//invio comando con nome
-					if (send_data(new_sockfd, NULL, file_download, &new_serveraddr, GET) < 0){
-						perror("errore in sendto");
-						exit(1);
-					}
-
-
-					//in attesa di ack
-
-					//crea file
-					FILE* new_file; 
-					new_file = fopen(file_download, "w+");
-
-					if(new_file == NULL){
-
-						printf("error in creation of '%s'\n", file_download);
-						exit(1);
-					}
-
-					//ricevi messaggi
-					int n = receive_data(new_sockfd, new_file, NULL, &new_serveraddr, NULL);
-					if (n < 0) {
-						perror("errore in thread_recvfrom");
-						exit(1);
-					}
-					
-					fclose(new_file);
+					client_get_operation(cmd_sock, data_sock);
 					break;
 
 				//put case
-				case 3:
-					
-					printf("What file do you want to upload ?\n");
-					scanf("%s", file_upload);
-
-					//verifico se il file esiste effettivamente
-					if(access(file_upload, F_OK) == -1){
-						printf("The file %s doesn't exist\n", file_upload);
-						break;
-					}
-					//check se lunghezza > MSS in caso impossibile inviare
-
-
-					//invio comando
-					if (send_data(new_sockfd, NULL, (unsigned char *)file_upload, &new_serveraddr, PUT) < 0){
-						perror("errore in sendto");
-						exit(1);
-					}
-
-					FILE *segment_file_transfert;
-					segment_file_transfert = fopen(file_upload, "rb"); // la b sta per binario, sennò la fread non funziona
-					
-					//devo conoscere la dimensione del file
-					if(stat(file_upload, &st) == -1){
-						printf("error in stat()\n");
-						exit(1);
-					}
-
-					if (send_data(new_sockfd, segment_file_transfert, NULL, &new_serveraddr, 0) < 0){
-						perror("errore in sendto");
-						exit(1);
-					}
-
-					//aspetto ack
-					
-					//free(file_upload);
+				case 3:	
+					client_put_operation(cmd_sock, data_sock);
 					break;
 
 				//exit case
 				case 4:
 
-					if (send_data(new_sockfd, NULL, NULL, &new_serveraddr, FIN) < 0){
+					if (send_data(cmd_sock, NULL, FIN) < 0){
 						perror("errore in sendto");
 						exit(1);
 					}
@@ -240,8 +170,6 @@ int main(int argc, char *argv[ ]) {
 					break;
 	
 			}	
-			memset(file_upload, 0, 100);
-			memset(file_download, 0, 100);
 
 		}
 	}

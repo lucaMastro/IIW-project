@@ -1,11 +1,29 @@
 #include <stdint.h>
 #include <stdio.h>
 
+/*	tra l'intervallo di numerazione I e la finestra di trasmissione N 
+ *	deve valere:
+ *			      I
+ *			N <= ---
+ *				  2
+ *
+ *	quindi se I è a k bit:
+ *			
+ *			N <= 2^(k - 1)
+ *	*/			  
+
+
 #ifndef MESSAGE_H
 # define MESSAGE_H 
 	
-#define HEADER_SIZE 17
-#define MSS 500
+#define HEADER_SIZE 	6	
+#define MSS				5
+#define N  				8		
+//#define T				
+//#define p 			
+
+
+
 
 #define SYN 				1
 #define SYN_ACK 			2
@@ -17,14 +35,13 @@
 #define CHAR_INDICATOR 		128
 #define END_OF_DATA			256
 
+
 typedef struct message{
-	uint32_t seq_num;
-	uint32_t ack_num;
+	uint8_t seq_num;
+	uint8_t ack_num;
+	//uint8_t seq_ack_num; //[<4 bit seq> <4 bit ack>]
 	uint16_t flag;
-	//uint16_t new_port;
-	uint16_t rec_win;
-	uint32_t length;
+	uint16_t length;
 	unsigned char list_data[MSS];
-//	FILE *file_data;
 } Message;
 #endif

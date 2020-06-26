@@ -13,31 +13,29 @@
 #include <sys/sem.h>
 
 #include "../../lib/readwrite/read-write.h"
-#include "../../lib/functions/functions.h"
+#include "../../lib/active_functions/server_operations.h"
 
 extern int h_errno;
 
 #define SERV_PORT   5193 
-#define MAXLINE     1024
 #define DIM_FILE_LIST 200
-
+#define MAX_PORT_NUMBER 200
+#define SERVER_FOLDER "src/server/server-files/"
 
 struct port_thread{
 
   int port_client;
-  int port_new_socket;
+  int port_new_socket[2];
   int thread_index;
   int semaphore;
   //indirizzo ip mittente;
 };
 
-int generate_port(){
-	return (rand() % (65535 + 1 - 49152)) + 49152;
-}
+
 
 int check_port(int port, int * array){
 	int i; 
-    for(i = 0; i < PORT_NUMBER_MAX; i++){ 
+    for(i = 0; i < MAX_PORT_NUMBER; i++){ 
         if (array[i] == port)
 			return 0;
     } 
@@ -61,6 +59,25 @@ void insert_new_port(int port, int *array){
     return;
 }
 
+void generate_port(int *array_port, int *new_port_nums){
+	int port_num, val, i = 0;
+	srand(time(0));
+
+	do{
+		port_num = (rand() % (65535 + 1 - 49152)) + 49152;
+		val = check_port(port_num, array_port);
+		if (val == 1){
+			new_port_nums[i] = port_num;
+			//inserisco il nuovo numero di porta
+			insert_new_port(port_num, array_port);
+			i++;
+		}
+	}
+	while(i < 2);
+}
+
+
+
 void timer_handler (int signum){
 
   printf ("Timed out!\n");
@@ -69,16 +86,21 @@ void timer_handler (int signum){
 }
 
 
-/*	riceve dal main la nuova porta e porta client 
- *	rimane in attesa dell' ACK per 5 secondi
- *	quando scade il timer il thread muore
- *	e client dovrà rinviare il messaggio 
- *	se riceve ACK rimane in attesa di comandi	*/
-
 
 void *thread_function(void * port){
-	/* Start a timer that expires after 5 seconds */
+	int semaphore;
 	struct itimerval timer;
+	struct port_thread *my_port;
+	int n;
+	int flag;
+	char *name_file;
+
+	int cmd_sock, data_sock;
+	struct sockaddr_in cmd_addr_thread, data_addr_thread;
+	struct sockaddr_in cmd_addr_client, data_addr_client;
+	const socklen_t size = sizeof(struct sockaddr_in);
+
+	/* Start a timer that expires after 5 seconds */
 	timer.it_value.tv_sec = 5;
 	timer.it_value.tv_usec = 0;  //500000 = 0.5 seconds
 	timer.it_interval.tv_sec = 0;
@@ -86,86 +108,110 @@ void *thread_function(void * port){
 	setitimer (ITIMER_REAL, &timer, 0);
 	signal(SIGALRM, timer_handler);  
 
-	struct port_thread *my_port = (struct port_thread *) port;
-	printf("thread index: %d\nporta client: %d\nporta thread: %d\n", (*my_port).thread_index, (*my_port).port_client, (*my_port).port_new_socket);
+	my_port = (struct port_thread *) port;
+/*	printf("thread index: %d\nporta thread: %d\n",
+			my_port -> thread_index, 
+			//my_port -> port_client, 
+			my_port -> port_new_socket);*/
 
-	int sockfd_thread;
-	int semaphore = my_port -> semaphore;
-	struct sockaddr_in *addr_thread = malloc (sizeof(addr_thread));
+	semaphore = my_port -> semaphore;
+	//struct sockaddr_in *cmd_addr_thread = malloc (sizeof(addr_thread));
 
 	//creo socket
-	if ((sockfd_thread = socket(AF_INET, SOCK_DGRAM, 0)) < 0) { 
+	if ((cmd_sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0) { 
 		perror("errore in socket_thread");
-		exit(1);
-	}
-
-	memset((void *)addr_thread, 0, sizeof(*addr_thread));
-	addr_thread->sin_family = AF_INET;
-	addr_thread->sin_addr.s_addr = htonl(INADDR_ANY); 
-	addr_thread->sin_port = htons((*my_port).port_new_socket);
-
-
-	/* assegna l'indirizzo al socket */
-	if (bind(sockfd_thread, (struct sockaddr *)addr_thread, sizeof(*addr_thread)) < 0) {
-		perror("errore in thread_bind");
-		exit(1);
-	}
-
-	Message *received_ACK = malloc(sizeof(Message));
-	if (received_ACK == NULL){
-		perror("error in malloc");
 		exit(EXIT_FAILURE);
 	}
 
+	memset((void *)&cmd_addr_thread, 0, sizeof(cmd_addr_thread));
+	cmd_addr_thread.sin_family = AF_INET;
+	cmd_addr_thread.sin_addr.s_addr = htonl(INADDR_ANY); 
+	cmd_addr_thread.sin_port = htons(my_port -> port_new_socket[0]);
+
+
+	/* assegna l'indirizzo al socket */
+	if (bind(cmd_sock, (struct sockaddr *)&cmd_addr_thread,
+				sizeof(cmd_addr_thread)) < 0) {
+		perror("errore in thread_bind");
+		exit(EXIT_FAILURE);
+	}
+
+
 	//waiting for ACK
-	int n;
-	struct sockaddr_in client_addr;
-	client_addr.sin_family = AF_INET;
-	struct timeval timeout = {2,0}; //set timeout for 2 seconds
-
-	while(1){
-		//n = readn(sockfd_thread, received_ACK, NULL);
-
-		//n = readmessage(sockfd_thread, &received_ACK, &client_addr);
-		n = receive_data(sockfd_thread, NULL, NULL, &client_addr, NULL);
+	cmd_addr_client.sin_family = AF_INET;
+	//struct timeval timeout = {2,0}; //set timeout for 2 seconds
+	do{
+		n = receive_unconnected(cmd_sock, NULL, NULL, &cmd_addr_client, 
+				&flag);
 		if (n < 0) {
 			perror("errore in thread_recvfrom");
 			exit(1);
 		}
+	} while (!(flag & ACK));
 
-
-  		//disattivo timer ack
-		timer.it_value.tv_sec = 0;
-		timer.it_value.tv_usec = 0;
-		setitimer (ITIMER_REAL, &timer, 0);
-		break;
-	}
+	//disattivo timer ack
+	timer.it_value.tv_sec = 0;
+	timer.it_value.tv_usec = 0;
+	setitimer (ITIMER_REAL, &timer, 0);
 
 	printf("Ack received\n\n");
 	
-	printf("connect\n");
-	socklen_t size = sizeof(client_addr);
-	if (connect(sockfd_thread, (struct sockaddr*) &client_addr, size) < 0){
+	if (connect(cmd_sock, (struct sockaddr*) &cmd_addr_client, size) < 0){
 		perror("error in connect");
 		exit(EXIT_FAILURE);
 	}
+	printf("connected\n");
+	
 
+	//creating a new socket for data.
+	data_addr_thread.sin_family = AF_INET;
+	data_addr_thread.sin_addr.s_addr = htonl(INADDR_ANY); 
+	data_addr_thread.sin_port = htons(my_port -> port_new_socket[1]);
 
-	//waiting for command
-	Message *command_message_thread = malloc(sizeof(Message)); 
-	if (command_message_thread == NULL){
-		perror("error in malloc");
+	if ((data_sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0) { 
+		perror("errore in command sock");
 		exit(EXIT_FAILURE);
 	}
 
-	int flag;
-	unsigned char *name_file;
+	/* assegna l'indirizzo al socket */
+	if (bind(data_sock, (struct sockaddr *)&data_addr_thread,
+				//sizeof(cmd_addr_thread)) < 0) {
+				size) < 0) {
+		perror("errore in thread_bind");
+		exit(EXIT_FAILURE);
+	}
+
+	
+	//reading for the new sock
+	data_addr_client.sin_family = AF_INET;
+	//struct timeval timeout = {2,0}; //set timeout for 2 seconds
+	flag = 0;
+	do{
+		n = receive_unconnected(data_sock, NULL, NULL, &data_addr_client, 
+				&flag);
+		if (n < 0) {
+			perror("errore in thread_recvfrom");
+			exit(1);
+		}
+	} while(!(flag & ACK));
+
+	if (connect(data_sock, (struct sockaddr*) &data_addr_client, size) < 0){
+		perror("error in connect");
+		exit(EXIT_FAILURE);
+	}
+	printf("connected\n");
+
+
+
+	//waiting for command
+
 	while(1){
 
 		printf("\nServer waitings for command\n");
 
 		name_file = NULL;
-		n = receive_data(sockfd_thread, NULL, &name_file, addr_thread, &flag);
+
+		n = receive_data(cmd_sock, &name_file, &flag);
 		if (n < 0) {
 			perror("errore in thread_recvfrom");
 			exit(1);
@@ -177,19 +223,7 @@ void *thread_function(void * port){
 			case LIST:
 
 				printf("list case received\n");
-
-				char file_thread[DIM_FILE_LIST];
-				memset((void*) file_thread, 0, DIM_FILE_LIST);
-				list_function(file_thread, sizeof(file_thread));
-				printf("len: %ld\n", strlen(file_thread));
-				
-				//invio ack + data
-				printf("invio ack + data\n");
-				if (send_data(sockfd_thread, NULL, (unsigned char*)file_thread, &client_addr, ACK) < 0){
-						perror("errore in sendto");
-						exit(1);
-				}
-
+				server_list_operation(cmd_sock, data_sock);
 
 				break;
 
@@ -198,65 +232,30 @@ void *thread_function(void * port){
 
 				printf("get case received\n");
 				printf("Request of download for '%s' \n",name_file);
+				server_get_operation(cmd_sock, data_sock, name_file);
 				
-				//verifico se il file esiste effettivamente
-				if(access(name_file, F_OK) == -1){
-					printf("The file %s doesn't exist\n", name_file);
-					//avverti client
-					break;
-				}
-
-				//invio richiesta di put al client
-
-				//apro file
-				FILE *segment_file_transfert;
-				segment_file_transfert = fopen(name_file, "rb"); // la b sta per binario, sennò la fread non funziona
-
-				//inizio trasmissione, praticamnete put case lato server
-				if (send_data(sockfd_thread, segment_file_transfert, NULL, addr_thread, 0) < 0){
-					perror("errore in sendto");
-					exit(1);
-				}
-
-				//attesa ack
-
 				break;
 
 			//put case file
 			case PUT:
 
 				printf("put case received\n");
-				//creo il file
-				FILE *file_received;
-
-				//controllo se già non esiste, in caso rinominalo es pippo1.txt
-				printf("trying getting coin\n");
-				if (check_for_existing_file(semaphore,
-							name_file,
-							&file_received,
-							my_port -> thread_index ) < 0){
-					exit(EXIT_FAILURE);
-				}
-				
-				n = receive_data(sockfd_thread, file_received, NULL, addr_thread, NULL);
-				if (n < 0) {
-					perror("errore in thread_recvfrom");
-					exit(1);
-				}
-				
-				fclose(file_received);
+				server_put_operation(cmd_sock, data_sock, name_file, semaphore);
 				break;
 
 			case FIN:
 
-				//invio ack 
 				printf("Exit case received\n");
-				//dealloco, rimuovo la mia porta
-				free(command_message_thread);
-				delete_new_port((*my_port).port_new_socket);
-				return NULL;
+				//invio ack 
+				//
+				//
+				
+				
+				//rilascio delle risorse
 		}
 
+		//it's allocate in each PUT-GET-LIST request
+	//	memset((void*)name_file, 1, strlen(name_file));
 		free(name_file);
 
 	}
@@ -267,22 +266,21 @@ void *thread_function(void * port){
 
 int main(int argc, char **argv) {
   
-	socklen_t len;
 	struct sockaddr_in addr;
 	int sockfd;
 	pthread_t tid;
 	int thread_count = 0; 
-    int new_port_num;
-   	int val = 0;
+    int new_port_nums[2];
 	int flag;
 	int semaphore; //sempahore to check name files in put requests
-	Message *message_main, *syn_request;
 	
 	if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) { /* crea il socket */
 		perror("errore in socket");
 		exit(1);
 	}
 	
+
+	//semaphore to manage put requests
 	semaphore = semget(IPC_PRIVATE, 1, IPC_CREAT | 0666);
 	if (semaphore < 0){
 		perror("error inizializing semaphore");
@@ -293,10 +291,11 @@ int main(int argc, char **argv) {
 		exit(EXIT_FAILURE);	
 	}
 
-	memset((void *)&addr, 18, sizeof(addr));
+	//setting address
+	memset((void *)&addr, 0, sizeof(addr));
 	addr.sin_family = AF_INET;
 	addr.sin_addr.s_addr = htonl(INADDR_ANY); 
-	addr.sin_port = htons(SERV_PORT ); 
+	addr.sin_port = htons(SERV_PORT); 
 
 	/* assegna l'indirizzo al socket */
 	if (bind(sockfd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
@@ -304,82 +303,63 @@ int main(int argc, char **argv) {
 		exit(1);
 	}
 
-	//messaggio di SYN_ACK
-	/*message_main = malloc (sizeof(Message));
-	if (message_main == NULL){
-		perror("error in malloc");
-		exit(EXIT_FAILURE);
-	}
+	int array_port[MAX_PORT_NUMBER];
+	struct port_thread struct_port;
 
-	message_main -> seq_num = 0;
-	message_main -> ack_num = 0;
-	message_main -> flag = 1;
-	message_main -> rec_win = 0;
-	message_main -> length = 0;
-*/
-	array_port = (int *) malloc ((sizeof (int)) * PORT_NUMBER_MAX);
-	struct port_thread *struct_port;
-	syn_request = malloc(sizeof(Message));
-	if (syn_request == NULL){
-		perror("error in malloc");
-		exit(EXIT_FAILURE);
-	}
 	while (1) {
 
-		//dovrà essere deallocata nel thread
-		struct_port = malloc (sizeof(struct port_thread));
+		struct sockaddr_in *client_addr;
+		client_addr = (struct sockaddr_in*)
+						malloc(sizeof(struct sockaddr_in));
 
-		struct sockaddr_in client_addr;
-		client_addr.sin_family = AF_INET;
+		if (client_addr == NULL){
+			perror("error in malloc");
+			exit(EXIT_FAILURE);
+		}
 
-		//if (readmessage(sockfd, &syn_request, &client_addr) < 0){
-		if (receive_data(sockfd, NULL, NULL, &client_addr, &flag) < 0){
+		client_addr -> sin_family = AF_INET;
+
+		//waiting for syn request
+		if (receive_unconnected(sockfd, NULL, NULL, client_addr, &flag) < 0){
 			perror("errore in recvfrom");
 			exit(1);
 		}
 		/*	check sul flag	*/
+		if ((flag & SYN) != SYN) continue;
+
+
 		printf("syn received");
 
-	    // prendo numero porta client
-    	getpeername(sockfd, (struct sockaddr*)&client_addr, &len);
-	//	if(ntohs(client_addr.sin_port) == 5193) continue;
-
-    	/* genero una nuova porta per la socket del thread e
-		 * passo le porte al thread */
-    	struct_port -> port_client = ntohs(client_addr.sin_port);
-    
-	    //check se numero di porta già occupato
-		//while(val == 0)
-		do{
-			//numero di porta non valido, val = 1 se porta non presente
-			new_port_num = generate_port();
-			val = check_port(new_port_num, array_port);
-		}
-		while(val == 0);
+		generate_port(array_port, new_port_nums);
 
 		//val = 0;
-		struct_port -> port_new_socket = new_port_num;
+		struct_port.port_new_socket[0] = new_port_nums[0];
+		struct_port.port_new_socket[1] = new_port_nums[1];
+		printf("my new ports: %u, %u\n", struct_port.port_new_socket[0],
+				struct_port.port_new_socket[1]);
 
-		//inserisco il nuovo numero di porta
-		insert_new_port(new_port_num, array_port);
 
-		struct_port -> semaphore = semaphore;
-		struct_port -> thread_index = thread_count;
-		pthread_create(&tid, NULL, thread_function, (void *)struct_port);
+		struct_port.semaphore = semaphore;
+		struct_port.thread_index = thread_count;
+		pthread_create(&tid, NULL, thread_function, (void *)&struct_port);
 		thread_count ++;
 
-		//message_main -> new_port = new_port_num;
 
+		//6 bytes: num part <= 2^16 = 65536. 
+		//then 2 num ports: 10, 1 space, numbers and 1 '\0' 
+		unsigned char port_num_string[12];
+		memset(port_num_string, 0, 12);
+		sprintf(port_num_string, "%u %u", new_port_nums[0], new_port_nums[1]);
+		printf("string num: %s\n", port_num_string);
 
-		unsigned char port_num_string[6];
-		memset(port_num_string, 0, 6);
-		sprintf(port_num_string, "%d", new_port_num);
+		//sending syn-ack
 
-	//	if (writemess(sockfd, message_main, &client_addr) < 0){
-		if (send_data(sockfd, NULL, port_num_string, &client_addr, SYN_ACK) < 0){
+		if (send_unconnected(sockfd, NULL, port_num_string, client_addr, SYN_ACK) < 0){
 			perror("errore in sendto");
 			exit(EXIT_FAILURE);
 		}
+		free(client_addr);
 	}
+
 	exit(0);
 }
