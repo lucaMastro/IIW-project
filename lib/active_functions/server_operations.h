@@ -1,9 +1,13 @@
-/*#include <stdio.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>
-#include "../readwrite/read-write.h" */
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/sem.h>
+#include <dirent.h>
+//#include "../readwrite/read-write.h" 
 
 #define SERVER_FOLDER "src/server/server-files/"
 
@@ -85,7 +89,7 @@ void server_put_operation(int cmd_sock, int data_sock, char *file_name, int sem_
 		exit(EXIT_FAILURE);	
 	}
 
-	n = receive_data(data_sock, file_received, NULL);
+	n = receive_data(data_sock, cmd_sock, file_received, NULL);
 	if (n < 0) {
 		perror("errore in thread_recvfrom");
 		exit(EXIT_FAILURE);	
@@ -125,7 +129,7 @@ void server_get_operation(int cmd_sock, int data_sock, char *file_requested){
 	FILE *file_to_send;
 	file_to_send = fopen(complete_path, "rb"); 
 
-	if (send_data(data_sock, file_to_send, 0) < 0){
+	if (send_data(data_sock, cmd_sock, file_to_send, 0) < 0){
 		perror("errore in sendto");
 		exit(EXIT_FAILURE);
 	}
@@ -179,6 +183,6 @@ void server_list_operation(int cmd_sock, int data_sock){
 	char *file_list = make_file_list();
 	
 	printf("file list = %s\n", file_list);
-	send_data(data_sock, file_list, CHAR_INDICATOR);
+	send_data(data_sock, cmd_sock, file_list, CHAR_INDICATOR);
 	free(file_list);
 }

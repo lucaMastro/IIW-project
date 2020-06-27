@@ -11,11 +11,20 @@
 #include <dirent.h>
 #include <sys/ipc.h>
 #include <sys/sem.h>
+extern int h_errno;
 
+#include "../../lib/structs/message_struct.h"
+#include "../../lib/structs/sending_queue.h"
+#include "../../lib/all_f.h"
+
+#include "../../lib/passive_functions/passive-functions.h"
+#include "../../lib/passive_functions/reliable-conn/sending_queue_manager.h"
+//#include "../../lib/passive_functions/passive-functions.h"
+#include "../../lib/serialize/serialize.h"
+#include "../../lib/serialize/deserialize.h"
 #include "../../lib/readwrite/read-write.h"
 #include "../../lib/active_functions/server_operations.h"
 
-extern int h_errno;
 
 #define SERV_PORT   5193 
 #define DIM_FILE_LIST 200
@@ -204,19 +213,31 @@ void *thread_function(void * port){
 
 
 	//waiting for command
+	Message *cmd, ack;
+	/*Message *cmd = (Message*) malloc(sizeof(Message));
+	if (cmd ==NULL){
+		perror("error malloc");
+		exit(EXIT_FAILURE);
+	}*/
 
+	make_packet(&ack, NULL, 0, 0, ACK);
 	while(1){
 
 		printf("\nServer waitings for command\n");
 
 		name_file = NULL;
 
-		n = receive_data(cmd_sock, &name_file, &flag);
-		if (n < 0) {
-			perror("errore in thread_recvfrom");
-			exit(1);
-		}
+		//n = receive_data(data_sock, cmd_sock, &name_file, &flag);
 
+		//waiting for command mex:
+		cmd = receive_packet(cmd_sock);
+		flag = cmd -> flag;
+
+		//stampa_mess(cmd);
+		//sending ack
+		ack.ack_num = cmd -> seq_num;
+		send_packet(cmd_sock, &ack);
+		
 		switch(flag & (LIST | PUT | GET | FIN)){
 
 			//list case
@@ -231,8 +252,8 @@ void *thread_function(void * port){
 			case GET:
 
 				printf("get case received\n");
-				printf("Request of download for '%s' \n",name_file);
-				server_get_operation(cmd_sock, data_sock, name_file);
+				printf("Request of download for '%s' \n", cmd -> list_data);
+				server_get_operation(cmd_sock, data_sock, cmd -> list_data);
 				
 				break;
 
@@ -257,6 +278,7 @@ void *thread_function(void * port){
 		//it's allocate in each PUT-GET-LIST request
 	//	memset((void*)name_file, 1, strlen(name_file));
 		free(name_file);
+		free(cmd);
 
 	}
 

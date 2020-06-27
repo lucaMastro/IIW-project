@@ -1,8 +1,8 @@
-//#include <stdio.h>
-//#include <stdlib.h>
-//#include <unistd.h>
-//#include <errno.h>
-//#include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <errno.h>
+#include <string.h>
 
 //#include "../readwrite/read-write.h"
 
@@ -56,7 +56,7 @@ void client_put_operation(int cmd_sock, int data_sock){
 
 
 	//invio comando: invio solo il nome del file, non l'intero apth
-	if (send_data(cmd_sock, file_to_send, (PUT | CHAR_INDICATOR)) < 0){
+	if (send_data(data_sock, cmd_sock, file_to_send, (PUT | CHAR_INDICATOR)) < 0){
 		perror("errore in write");
 		exit(1);
 	}
@@ -64,7 +64,7 @@ void client_put_operation(int cmd_sock, int data_sock){
 	FILE *segment_file_transfert;
 	segment_file_transfert = fopen(complete_path, "rb"); // la b sta per binario, sennò la fread non funziona
 					
-	if (send_data(data_sock, segment_file_transfert, 0) < 0){
+	if (send_data(data_sock, cmd_sock, segment_file_transfert, 0) < 0){
 		perror("errore in sendto");
 		exit(1);
 	}
@@ -125,20 +125,31 @@ void client_get_operation(int cmd_sock, int data_sock){
 		exit(1);		
 	}	
 
+
 	//invio comando con nome
-	if (send_data(cmd_sock, file_to_get, GET | CHAR_INDICATOR) < 0){
-		perror("errore in sendto");
-		exit(1);
-	}
 
-	//ricevi messaggi	
-	int n = receive_data(data_sock, new_file, NULL);
-	if (n < 0) {
-		perror("errore in thread_recvfrom");
-		exit(1);	
-	}	
+
+//	while(1){
+
+	/*	if (send_data(data_sock, cmd_sock, file_to_get, GET | CHAR_INDICATOR) < 0){
+			perror("errore in sendto");
+			exit(1);
+		}*/
+
+		Message get;
+		make_packet(&get, file_to_get, 0, 0,GET |CHAR_INDICATOR);
+		send_packet(cmd_sock, &get);
+		stampa_mess(&get);
+
+		//ricevi messaggi	
+		int n = receive_data(data_sock, cmd_sock, new_file, NULL);
+		if (n < 0) {
+			perror("errore in thread_recvfrom");
+			exit(1);	
+		}
+//	}
+
 	fclose(new_file);
-
 	free(file_to_get);
 	free(complete_path);
 }
@@ -150,21 +161,36 @@ void client_list_operation(int cmd_sock, int data_sock){
 	//faccio partire timer 
 	//setsockopt(new_cmd_sock,SOL_SOCKET,SO_RCVTIMEO,(char*)&timeout,sizeof(struct timeval));
 
-	if (send_data(cmd_sock, NULL, LIST) < 0){
+	/*if (send_data(data_sock, cmd_sock, NULL, LIST) < 0){
 		perror("errore in sendto");
 		exit(1);
-	}
-	printf("sent request\n");
+	}*/
 
-	//attesa di ack + data
+	Message list_mex, *ack = NULL;
+	make_packet(&list_mex, NULL, 0, 0, LIST);
+
+
+	struct timeval timeout;
+	do{
+		send_packet(cmd_sock, &list_mex);
+		printf("sent request\n");
+		timeout.tv_sec = 1;
+		timeout.tv_usec = 0;
+
+		//attesa di ack + data
+		ack = receive_packet(cmd_sock);
+	}
+	while (ack == NULL || (ack -> flag & ACK) == 0);
+
 	unsigned char *list = NULL;
 
-	if (receive_data(data_sock, &list, NULL ) < 0) {
+	printf("waiting for data:\n");
+	if (receive_data(data_sock, cmd_sock, &list, NULL ) < 0) {
 		perror("errore in recvfrom");
 		exit(1);
 	}
 
 	//stampo contenuto
-	 printf("list message content:\n%s\n", list);
+	 printf("list message content:\n%s.\n", list);
 	 free(list);
 }

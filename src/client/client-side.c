@@ -7,20 +7,31 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <pthread.h>
 
+#include "../../lib/structs/message_struct.h"
+#include "../../lib/structs/sending_queue.h"
+#include "../../lib/all_f.h"
+
+#include "../../lib/serialize/serialize.h"
+#include "../../lib/serialize/deserialize.h"
+#include "../../lib/passive_functions/reliable-conn/sending_queue_manager.h"
 #include "../../lib/readwrite/read-write.h"
+#include "../../lib/passive_functions/passive-functions.h"
+//#include "../../lib/passive_functions/passive-functions.h"
 #include "../../lib/active_functions/client_operations.h"
 
 #define SERV_PORT   5193 
 #define TIMER 		2
-//#define CLIENT_FOLDER "src/server/server-files/"
+#define MAX_CMD_SIZE 200
 
 
 
 int main(int argc, char *argv[ ]) {
 	int sockfd, cmd_sock, data_sock;
 	struct sockaddr_in servaddr, cmd_server_addr, data_server_addr;
-	int command;
+//	int command;
+	char command[MAX_CMD_SIZE];
 
 	if (argc != 2) { /* controlla numero degli argomenti */
 		printf("utilizzo: client <indirizzo IP server>\n");
@@ -48,7 +59,6 @@ int main(int argc, char *argv[ ]) {
 	}
 
 
-	while(1){
 		//in attesa di SYN ACK, ovvero in attesa del nuovo numero di porta
 		unsigned char *new_port = NULL;
 		char *tmp;
@@ -126,53 +136,67 @@ int main(int argc, char *argv[ ]) {
 			perror("error in malloc");
 			exit(EXIT_FAILURE);
 		}
-
-	//	struct timeval timeout = {TIMER,0}; //set timeout for 2 seconds
-
-		//invio comandi:
-		while(1){
-
-			printf("\nEnter any of the following commands: \n 1 -> ls \n 2 -> get \n 3 -> put \n 4 -> exit \n ");		
-			scanf("%d", &command);
-
-			switch(command){
-
-				//list case
-				case 1:
-					client_list_operation(cmd_sock, data_sock);
-					break;
-
-				//get case
-				case 2:
-
-					client_get_operation(cmd_sock, data_sock);
-					break;
-
-				//put case
-				case 3:	
-					client_put_operation(cmd_sock, data_sock);
-					break;
-
-				//exit case
-				case 4:
-
-					if (send_data(cmd_sock, NULL, FIN) < 0){
-						perror("errore in sendto");
-						exit(1);
-					}
-
-					exit(1);
-
-				//command not valid
-				default:
-
-					printf("command added not valid\n");
-					break;
 	
-			}	
+
+	
+	printf("cmd_sock = %d\ndata_sock = %d\n", cmd_sock, data_sock);
+		fd_set read_set;
+		FD_ZERO(&read_set);
+		int maxfd;
+		Message *cmd;
+		printf("Welcome to udt-reliable go-back-n ftp protocol.\n");
+		while (1){
+			//memset((void*) command, 0, MAX_CMD_SIZE);
+			printf("\nftp > ");
+			fflush(stdout);
+			FD_SET(cmd_sock, &read_set);
+			FD_SET(fileno(stdin), &read_set);
+
+			maxfd = fileno(stdin) < cmd_sock ? 
+				(cmd_sock + 1) : (fileno(stdin) + 1);
+
+			//l'ultimo parametro è struct timeval, per un timer
+			if (select(maxfd, &read_set, NULL, NULL, NULL) < 0){
+				perror("error in select");
+				exit(EXIT_FAILURE);
+			}
+
+			printf("select unlocked\n");
+			
+			if (FD_ISSET(cmd_sock, &read_set)){
+				char buf[1024];
+				read(cmd_sock, buf, 1024 );
+				printf("buf %s.\n", buf);
+				//check se flag del messaggio ricevuto è un FIN
+				cmd = receive_packet(cmd_sock);
+				if (cmd -> flag & FIN){
+					printf("unlock select by cmd socket. exiting\n");
+					exit(EXIT_SUCCESS);
+					
+				}
+			}
+			else{
+				//stdin:
+				if (fgets(command, MAX_CMD_SIZE, stdin) == NULL){
+					exit(EXIT_SUCCESS); //ctrl+c. need handler
+				}				
+				
+				if ( strstr(command, "ls"))
+					client_list_operation(cmd_sock, data_sock);
+				
+				else if ( strstr(command, "get\n")){
+					client_get_operation(cmd_sock, data_sock);
+				}
+				else if ( strstr(command, "put")){
+					client_put_operation(cmd_sock, data_sock);
+				}
+				else if ( strstr(command, "exit")){
+					exit(EXIT_SUCCESS);
+				}
+			}
 
 		}
-	}
+	
 
 	exit(0);
 }

@@ -1,5 +1,5 @@
 
-#include "../structs/message_struct.h"
+//#include "../structs/message_struct.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -55,51 +55,24 @@ unsigned char *serialize_header(Message *mex,unsigned char *buffer){
 	return tmp;
 }
 
-/*
-unsigned char *serialize_data(Message *mex, unsigned char *buffer){
-	//serialize mex -> file_data
-	
-	if ((mex -> flag & 128) == 128){ //char indicator turned on
-		copy_data_field(mex -> length, buffer, mex -> list_data);
-		//mex -> list_data = buffer;
-	}
-	else{
-		fread(buffer, sizeof(char), mex -> length, mex -> file_data);
-	}
+
+void serialize_data(Message *mex, unsigned char *buffer){
+	memcpy(buffer, mex -> list_data, mex -> length);
+}
 
 
-	return buffer + mex -> length;
-}*/
-
-/*
 unsigned char *serialize_message(Message *mex){
-	unsigned buf_size = HEADER_SIZE;
-	unsigned data_size = mex -> length;
-
-	if (data_size != 0)
-		buf_size += data_size;
-		
-		creo il buffer che verrà trasmesso. conterrà header e eventuali dati 
-	 *	serializzati	
-	unsigned char *serialized = (unsigned char*) malloc(sizeof(unsigned char) * buf_size);
-
+	int max_size = HEADER_SIZE + MSS;	
+	unsigned char *tmp;
+	unsigned char *serialized = (unsigned char *)
+		malloc(sizeof(unsigned char) * max_size);
 	if (serialized == NULL){
 		perror("error in malloc");
 		exit(EXIT_FAILURE);
 	}
-//	memset((void*) serialized, 0, buf_size);
 
-		serializzo header ed eventuali dati nello stesso buffer	
-	unsigned char *temp = serialized;  indica la posizione dove inserire dati
-										all'interno del buffer	
-	
-	temp = serialize_header(mex, temp);
-	//printf("head diff %u\n", serialized - temp);
-
-	if (data_size != 0){
-		temp = serialize_data(mex, temp);
-		//printf("diff %d\n\n", temp-tmp);
-	}
+	tmp = serialize_header(mex, serialized);
+	serialize_data(mex, tmp);	
 
 	return serialized;
-}*/
+}

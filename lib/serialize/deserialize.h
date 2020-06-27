@@ -1,4 +1,4 @@
-#include "../structs/message_struct.h"
+//#include "../structs/message_struct.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -35,39 +35,10 @@ unsigned char *deserialize_header(Message *mex,unsigned char *buffer){
 	return buffer;
 }
 
-/*
-Message *deserialize_data(Message *mex, unsigned char *buffer){
-	
-	//check for data-type:
-//	if ( (mex -> flag & 128) == 128){//char indicator turned on
-	mex -> list_data = buffer;
-	if ( (mex -> flag & 128) == 128){//char indicator turned on
-	
-		mex -> list_data [mex -> length] = '\0';
-	
-	}
-//	}
-//	else{ //char indicator turned off
-		unsigned i;
-		size_t size = mex -> length;
-		for (i = 0; i < size; i++){
-			if (fputc(buffer[i], mex -> file_data) == EOF){
-				perror("error in fputc");
-				exit(EXIT_FAILURE);
-			}		
-		}
-		
-//		unsigned length = mex -> length;
-//		mex -> list_data = (unsigned char*) malloc(sizeof(unsigned char) * length);
-//		if (mex -> list_data == NULL){
-//			perror("error in malloc");
-//			exit(EXIT_FAILURE);
-//		}
 
-//		copy_data_field(length, mex -> list_data, buffer);
+void deserialize_data(Message *mex, unsigned char *buffer){
 
-//	}
-	return mex;
+	memcpy(mex -> list_data, buffer, mex -> length);
 }
 
 Message *deserialize_message(unsigned char *buffer){
@@ -84,4 +55,4 @@ Message *deserialize_message(unsigned char *buffer){
 
 	return mex;
 	
-}*/
+}

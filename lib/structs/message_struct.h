@@ -1,5 +1,5 @@
-#include <stdint.h>
-#include <stdio.h>
+//#include <stdint.h>
+//#include <stdio.h>
 
 /*	tra l'intervallo di numerazione I e la finestra di trasmissione N 
  *	deve valere:
@@ -10,6 +10,8 @@
  *	quindi se I è a k bit:
  *			
  *			N <= 2^(k - 1)
+ *
+ *		I è a 8 bit. allora N <= 2^7 = 128
  *	*/			  
 
 
@@ -17,8 +19,9 @@
 # define MESSAGE_H 
 	
 #define HEADER_SIZE 	6	
-#define MSS				5
-#define N  				8		
+#define MSS				500
+#define RECEIVE_WINDOW	8		
+#define MAX_SEQ_NUM 	255
 //#define T				
 //#define p 			
 
