@@ -56,10 +56,14 @@ void client_put_operation(int cmd_sock, int data_sock){
 
 
 	//invio comando: invio solo il nome del file, non l'intero apth
-	if (send_data(data_sock, cmd_sock, file_to_send, (PUT | CHAR_INDICATOR)) < 0){
-		perror("errore in write");
-		exit(1);
-	}
+	//if (send_data(data_sock, cmd_sock, file_to_send, (PUT | CHAR_INDICATOR)) < 0){
+	Message put;
+	make_packet(&put, file_to_send, 0, 0, PUT |CHAR_INDICATOR);
+	send_packet(cmd_sock, &put);
+	stampa_mess(&put);
+
+	//wait for ack:
+	Message *ack = receive_packet(cmd_sock);
 
 	FILE *segment_file_transfert;
 	segment_file_transfert = fopen(complete_path, "rb"); // la b sta per binario, sennò la fread non funziona
@@ -141,6 +145,7 @@ void client_get_operation(int cmd_sock, int data_sock){
 		send_packet(cmd_sock, &get);
 		stampa_mess(&get);
 
+		Message *ack = receive_packet(cmd_sock);
 		//ricevi messaggi	
 		int n = receive_data(data_sock, cmd_sock, new_file, NULL);
 		if (n < 0) {

@@ -261,7 +261,8 @@ void *thread_function(void * port){
 			case PUT:
 
 				printf("put case received\n");
-				server_put_operation(cmd_sock, data_sock, name_file, semaphore);
+				server_put_operation(cmd_sock, data_sock, 
+						cmd -> list_data, semaphore);
 				break;
 
 			case FIN:
