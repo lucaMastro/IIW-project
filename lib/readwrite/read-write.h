@@ -135,7 +135,7 @@ ssize_t send_data(int data_sock, int cmd_sock, void *data, int type){
 	pthread_create(&tid, NULL, waiting_for_ack, (void*) queue);
 
 	do{
-	sleep(2);
+	//sleep(2);
 		if (semop(queue -> semaphore, &sops, 1) < 0){
 			perror("error trying get coin");
 			exit(EXIT_FAILURE);
@@ -190,7 +190,12 @@ ssize_t send_data(int data_sock, int cmd_sock, void *data, int type){
 	} //while(mex.length == MSS);
 	while( (flag & END_OF_DATA) != END_OF_DATA ); //quando è == 1 ho inviato l'ultimo	
 
-	//free(queue);
+	if (pthread_join(tid, NULL) < 0){
+		perror("error in join");
+		exit(EXIT_FAILURE);
+	}
+	printf("joined\n");
+	free(queue);
 	return bytes_sent;
 }
 
