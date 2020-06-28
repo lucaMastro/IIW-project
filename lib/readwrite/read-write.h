@@ -61,7 +61,7 @@ void *make_packet(Message *mess_to_fill, void *read_data_from_here, int seq_num,
 	int min;
 
 	if (read_data_from_here != NULL){
-		printf("ok\n");
+		//printf("ok\n");
 		if ( !(CHAR_INDICATOR & flag_to_set) ){
 			bytes_read = fread(mess_to_fill -> list_data, 1, MSS, (FILE*) read_data_from_here);
 			mess_to_fill -> length = bytes_read;
@@ -78,14 +78,14 @@ void *make_packet(Message *mess_to_fill, void *read_data_from_here, int seq_num,
 			memcpy(mess_to_fill -> list_data, (unsigned char*) read_data_from_here, mess_to_fill -> length);
 			//in questo caso ritorno la posizione della stringa da cui continuare a leggere
 			return_addr = (unsigned char*)read_data_from_here + min;
-			printf("mess len = %d\n", mess_to_fill -> length);
+			//printf("mess len = %d\n", mess_to_fill -> length);
 		}
 	}
 	else
 		mess_to_fill -> length = 0;
 
 	if (mess_to_fill -> length < MSS){
-		printf("end of data set\n");
+		//printf("end of data set\n");
 		mess_to_fill -> flag += END_OF_DATA;
 	}
 
@@ -131,7 +131,7 @@ ssize_t send_data(int data_sock, int cmd_sock, void *data, int type){
 	queue -> semaphore = sem;
 	queue -> cmd_sock = cmd_sock;
 
-	printf("starting thread\n");
+	//printf("starting thread\n");
 	pthread_create(&tid, NULL, waiting_for_ack, (void*) queue);
 
 	do{
@@ -170,8 +170,8 @@ ssize_t send_data(int data_sock, int cmd_sock, void *data, int type){
 
 		//store the message in the queue:
 		queue -> on_fly_message_queue[mex -> seq_num % RECEIVE_WINDOW]	= mex;
-		printf("%p\n",queue -> on_fly_message_queue[1]);
-		sleep(1);
+		//printf("%p\n",queue -> on_fly_message_queue[1]);
+		//sleep(1);
 		//incremento seq_num
 		queue -> next_seq_num = (queue -> next_seq_num + 1) % MAX_SEQ_NUM;
 
@@ -242,8 +242,8 @@ ssize_t receive_data(int data_sock, int cmd_sock, void *write_here,
 			expected_seq_num = (expected_seq_num + 1) % MAX_SEQ_NUM;
 		}
 
-		printf("sending ack:\n");
-		stampa_mess(&ack);
+		//printf("sending ack:\n");
+		//stampa_mess(&ack);
 		send_packet(cmd_sock, &ack);
 	}
 	while ((flag & END_OF_DATA) != END_OF_DATA);
@@ -369,7 +369,6 @@ size_t receive_unconnected(int fd, FILE *write_here, unsigned char **write_strin
 	//while(n_read == max_size);
 	while ((mex.flag & END_OF_DATA) != END_OF_DATA);
 
-	printf("exited\n");
 	
 	return n_read;
 

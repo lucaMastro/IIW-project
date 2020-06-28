@@ -60,7 +60,7 @@ void client_put_operation(int cmd_sock, int data_sock){
 	Message put;
 	make_packet(&put, file_to_send, 0, 0, PUT |CHAR_INDICATOR);
 	send_packet(cmd_sock, &put);
-	stampa_mess(&put);
+	//stampa_mess(&put);
 
 	//wait for ack:
 	Message *ack = receive_packet(cmd_sock);
@@ -143,7 +143,7 @@ void client_get_operation(int cmd_sock, int data_sock){
 		Message get;
 		make_packet(&get, file_to_get, 0, 0,GET |CHAR_INDICATOR);
 		send_packet(cmd_sock, &get);
-		stampa_mess(&get);
+		//stampa_mess(&get);
 
 		Message *ack = receive_packet(cmd_sock);
 		//ricevi messaggi	
