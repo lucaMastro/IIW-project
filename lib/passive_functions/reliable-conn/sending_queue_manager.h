@@ -11,7 +11,7 @@
 
 
 __thread Sending_queue *queue;
-__thread timer_t *timer_id;
+__thread timer_t timer_id;
 
 
 
@@ -66,11 +66,8 @@ void retrasmission(Sending_queue *queue){
 	restart_timer.it_value.tv_nsec = Tnsec;
 	restart_timer.it_interval.tv_sec = 0;
 	restart_timer.it_interval.tv_nsec = 0;
-	//printf("\n\ndebug:\nrestart: %p\nnsec = %lu\n", 
-	//		&restart_timer.it_value,
-	//		restart_timer.it_value.tv_nsec);
 
-	if (timer_settime(*timer_id, 0, &restart_timer, NULL) < 0){
+	if (timer_settime(timer_id, 0, &restart_timer, NULL) < 0){
 		printf("%d\n", errno);
 		perror("error in starting timer in rx");
 		exit(EXIT_FAILURE);
@@ -130,11 +127,11 @@ void *waiting_for_ack(void *q){
 
 	signal(SIGALRM, retrasmission_handler);  
 	
-	timer_id = malloc(sizeof(timer_id));
+	/*timer_id = malloc(sizeof(timer_id));
 	if (timer_id == NULL){
 		perror("error malloc timerid");
 		exit(EXIT_FAILURE);
-	}
+	}*/
 	
 	struct sigevent se;	
 	se.sigev_notify = SIGEV_THREAD_ID;
@@ -156,18 +153,18 @@ void *waiting_for_ack(void *q){
 
 //	struct itimerspec timer;
 
-	printf("initial timer: %p\n", *timer_id);
-	if (timer_create(CLOCK_REALTIME, &se, timer_id) < 0){
+	printf("initial timer: %p\n", timer_id);
+	if (timer_create(CLOCK_REALTIME, &se, &timer_id) < 0){
 		perror("error in timer_create");
 		exit(EXIT_FAILURE);
 	}
-	printf("%p\n", *timer_id);
+	printf("%p\n", timer_id);
 /*	timer.it_value.tv_sec = Tsec;
 	timer.it_value.tv_nsec = Tnsec;
 	timer.it_interval.tv_sec = 0;
 	timer.it_interval.tv_nsec = 0;*/
 
-	if (timer_settime(*timer_id, 0, &start_timer, NULL) < 0){
+	if (timer_settime(timer_id, 0, &start_timer, NULL) < 0){
 		perror("error in starting timer");
 		exit(EXIT_FAILURE);
 	}
@@ -199,7 +196,7 @@ void *waiting_for_ack(void *q){
 		else{ //nuovo ack
 			printf("nuovo ack: %u\n", ack -> ack_num);
 			//disattivo timer:
-			if (timer_settime(*timer_id, 0, &stop_timer, NULL) < 0){
+			if (timer_settime(timer_id, 0, &stop_timer, NULL) < 0){
 				perror("error in stopping timer");
 				exit(EXIT_FAILURE);
 			}
@@ -218,7 +215,7 @@ void *waiting_for_ack(void *q){
 				perror("error unlocking semaphore");
 				exit(EXIT_FAILURE);
 			}
-			if (timer_settime(*timer_id, 0, &start_timer, NULL) < 0){
+			if (timer_settime(timer_id, 0, &start_timer, NULL) < 0){
 				perror("error in starting timer");
 				exit(EXIT_FAILURE);
 			}
