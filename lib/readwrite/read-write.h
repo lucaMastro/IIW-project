@@ -9,12 +9,6 @@
 #include <sys/ipc.h>
 #include <sys/sem.h>
 
-//#include "../serialize/deserialize.h"
-//#include "../serialize/serialize.h"
-//#include "../passive_functions/passive-functions.h"
-//#include "../passive_functions/reliable-conn/sending_queue_manager.h"
-//#include "../structs/sending_queue.h"
-
 
 void write_data(Message *mex, void *dest, unsigned char *src, int *str_len, int *old_str_len);
 void send_ack(int cmd_sock, int ack_num);
@@ -61,7 +55,6 @@ void *make_packet(Message *mess_to_fill, void *read_data_from_here, int seq_num,
 	int min;
 
 	if (read_data_from_here != NULL){
-		//printf("ok\n");
 		if ( !(CHAR_INDICATOR & flag_to_set) ){
 			bytes_read = fread(mess_to_fill -> list_data, 1, MSS, (FILE*) read_data_from_here);
 			mess_to_fill -> length = bytes_read;
@@ -69,16 +62,11 @@ void *make_packet(Message *mess_to_fill, void *read_data_from_here, int seq_num,
 		else{
 			int str_len = strlen((char*)read_data_from_here);
 			min = str_len < MSS ? str_len : MSS;
-	/*		if (str_len < MSS)
-				min = str_len;
-			else
-				min = MSS;*/
 
 			mess_to_fill -> length = min;
 			memcpy(mess_to_fill -> list_data, (unsigned char*) read_data_from_here, mess_to_fill -> length);
 			//in questo caso ritorno la posizione della stringa da cui continuare a leggere
 			return_addr = (unsigned char*)read_data_from_here + min;
-			//printf("mess len = %d\n", mess_to_fill -> length);
 		}
 	}
 	else
@@ -130,15 +118,17 @@ ssize_t send_data(int data_sock, int cmd_sock, void *data, int type){
 
 	queue -> semaphore = sem;
 	queue -> cmd_sock = cmd_sock;
+	queue -> data_sock = data_sock;
 
-	//printf("starting thread\n");
 	pthread_create(&tid, NULL, waiting_for_ack, (void*) queue);
 
 	do{
-	//sleep(2);
-		if (semop(queue -> semaphore, &sops, 1) < 0){
-			perror("error trying get coin");
-			exit(EXIT_FAILURE);
+		while (semop(queue -> semaphore, &sops, 1)< 0) {
+			if (errno != EINTR){
+				perror("error trying get coin");
+				exit(EXIT_FAILURE);
+				
+			}
 		}
 		
 		//cerco la sock su cui inviare:
@@ -153,36 +143,31 @@ ssize_t send_data(int data_sock, int cmd_sock, void *data, int type){
 		memset((void*) mex -> list_data, 0, MSS);
 
 
-		//if (data != NULL){
-			if ( (type & CHAR_INDICATOR) == CHAR_INDICATOR)
-				new_data_pointer = (unsigned char *) 
-					make_packet(mex, new_data_pointer, 
-					queue -> next_seq_num, //seq_num
-					0, 					//ack_num
-					type);
-			else
-				make_packet(mex, data, 
-					queue -> next_seq_num, 
-					0, 
-					type);
-		//}
+		if ( (type & CHAR_INDICATOR) == CHAR_INDICATOR)
+			new_data_pointer = (unsigned char *) 
+				make_packet(mex, new_data_pointer, 
+				queue -> next_seq_num, //seq_num
+				0, 					//ack_num
+				type);
+		else
+			make_packet(mex, data, 
+				queue -> next_seq_num, 
+				0, 
+				type);
+
 		sending_sock = (is_command_mex(mex) ) ? cmd_sock : data_sock;
+
+		//printf("send packet at %p:", mex);
+		//stampa_mess(mex);
+		printf("sent seq_num = %u\n", mex -> seq_num);
 
 		//store the message in the queue:
 		queue -> on_fly_message_queue[mex -> seq_num % RECEIVE_WINDOW]	= mex;
-		//printf("%p\n",queue -> on_fly_message_queue[1]);
-		//sleep(1);
 		//incremento seq_num
 		queue -> next_seq_num = (queue -> next_seq_num + 1) % MAX_SEQ_NUM;
 
 		send_packet(sending_sock, mex);
 		packet_sent ++;
-		/*
-
-		if (mex -> length == 0)
-			mex -> flag = mex -> flag | END_OF_DATA;
-*/
-		//len_ser += mex -> length;
 		
 		//save flag for exiting
 		flag = mex -> flag;
@@ -210,20 +195,14 @@ ssize_t receive_data(int data_sock, int cmd_sock, void *write_here,
 	uint16_t flag;
 	uint8_t expected_seq_num = 1;
 	
-	/*unsigned char *tmp;
-	unsigned char *serialized = (unsigned char *) malloc(sizeof(char) * max_size);
-	if (serialized == NULL){
-		perror("error in malloc");
-		exit(EXIT_FAILURE);
-	}
-	memset((void*) serialized, 0, max_size);*/
-	
+	int test_timer = 0;
+
 	Message ack;
 	make_packet(&ack, NULL, 0, 0, ACK);
 	do {
 		Message *mex;
 		//leggo
-		mex = receive_packet(data_sock);
+		mex = receive_packet(data_sock, NULL);
 		flag = mex -> flag;
 
 		//salvo flag per il controllo a serverside
@@ -234,16 +213,24 @@ ssize_t receive_data(int data_sock, int cmd_sock, void *write_here,
 		//è possibile che arrivino pacchetti con solo header
 		if (mex -> seq_num == expected_seq_num){
 			
-			if (mex -> length > 0){
-				//write_data(mex, write_here, tmp, &str_len, &old_str_len);	
-				write_data(mex, write_here, mex -> list_data, &str_len, &old_str_len);	
-			}	
-			ack.ack_num = expected_seq_num; 
-			expected_seq_num = (expected_seq_num + 1) % MAX_SEQ_NUM;
+			if (mex -> seq_num == 2 && test_timer == 0)
+				test_timer++;
+			else{
+				if (mex -> length > 0){
+					//write_data(mex, write_here, tmp, &str_len, &old_str_len);	
+					write_data(mex, write_here, mex -> list_data, &str_len, &old_str_len);	
+				}	
+
+			//test retrasmission. simulate lost of a entire window
+				ack.ack_num = expected_seq_num; 
+				expected_seq_num = (expected_seq_num + 1) % MAX_SEQ_NUM;
+				
+			}
 		}
 
-		//printf("sending ack:\n");
-		//stampa_mess(&ack);
+		printf("sending ack:");
+		stampa_mess(&ack);
+		printf("\n");
 		send_packet(cmd_sock, &ack);
 	}
 	while ((flag & END_OF_DATA) != END_OF_DATA);
@@ -375,24 +362,6 @@ size_t receive_unconnected(int fd, FILE *write_here, unsigned char **write_strin
 }
 
 
-/*void receive_ack(int cmd_sock, Message *mex ){
-	unsigned char *serialized =	(unsigned char*) 
-		malloc(sizeof(unsigned char) * HEADER_SIZE);
-
-	if (serialized == NULL){
-		perror("error in malloc");
-		exit(EXIT_FAILURE);
-	}
-	
-	if (read(cmd_sock, serialized, HEADER_SIZE) < 0){
-		perror("error reading ack");
-		exit(EXIT_FAILURE);
-	}
-
-	deserialize_header(mex, serialized);
-
-}*/
-
 int is_command_mex(Message *mex){
 	return (mex -> flag & (ACK | SYN | SYN_ACK | PUT | GET | LIST | FIN));
 }
@@ -409,54 +378,7 @@ void send_packet(int sockfd, Message *mex){
 	free(packet_ser);
 }
 
-
-/*
-void send_packet(int sockfd, int seq_num, int ack_num, int type, void *data){
-
-	int len_ser = HEADER_SIZE;
-	ssize_t bytes_sent;
-	unsigned char *packet_ser, *tmp;
-	unsigned char *new_data_pointer = (unsigned char *)data;
-	Message *mex = (Message *)malloc(sizeof(Message));
-
-	if (mex == NULL){
-		perror("error malloc");
-		exit(EXIT_FAILURE);		
-	}
-
-	mex -> length = 0;
-	mex -> flag = type;
-	memset((void*) mex -> list_data, 0, MSS);
-
-	if (data != NULL){
-		if ( (type & CHAR_INDICATOR) == CHAR_INDICATOR )
-				new_data_pointer = (unsigned char *) 
-					make_packet(mex, new_data_pointer, seq_num, ack_num, type);
-	
-		else
-			make_packet(mex, data, seq_num, ack_num, type);
-	}
-
-	if (mex -> length == 0)
-		mex -> flag = mex -> flag | END_OF_DATA;
-	
-	len_ser += mex -> length;
-	
-	packet_ser = (unsigned char*)malloc(sizeof(unsigned char) * len_ser);
-	if (packet_ser == NULL){
-		perror("error in malloc");
-		exit(EXIT_FAILURE);
-	}
-
-	serialize_packet(mex, packet_ser);
-
-	bytes_sent += write(sockfd, packet_ser, len_ser);
-
-	free(packet_ser);
-}*/
-
-
-Message *receive_packet(int sockfd){
+Message *receive_packet(int sockfd, struct timeval *time_out){
 
 	ssize_t n_read;
 	int max_size = HEADER_SIZE + MSS;
@@ -468,9 +390,26 @@ Message *receive_packet(int sockfd){
 	}
 	memset((void*) serialized, 0, max_size);
 
+	if (time_out != NULL){
+		printf("setto timer\n");
+		if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO,
+					(void*)time_out, sizeof(*time_out)) < 0){
+			perror("error setting timeout in receive packet");
+			exit(EXIT_FAILURE);
+		}
+	}
+
 	if ( (n_read = read(sockfd, serialized, max_size)) < 0){
-		perror("error in read");
-		exit(EXIT_FAILURE);
+		if (errno != EWOULDBLOCK && errno != EAGAIN){
+			perror("error in read");
+			exit(EXIT_FAILURE);
+			
+		}
+		else{
+			free(serialized);
+			printf("im returning null\n");
+			return NULL;
+		}
 	}
 
 	//alloco la struttura in deserialize

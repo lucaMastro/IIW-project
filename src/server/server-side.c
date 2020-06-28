@@ -230,7 +230,7 @@ void *thread_function(void * port){
 		//n = receive_data(data_sock, cmd_sock, &name_file, &flag);
 
 		//waiting for command mex:
-		cmd = receive_packet(cmd_sock);
+		cmd = receive_packet(cmd_sock, NULL);
 		flag = cmd -> flag;
 
 		//stampa_mess(cmd);

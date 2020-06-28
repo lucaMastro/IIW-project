@@ -8,6 +8,8 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <pthread.h>
+#include <sys/time.h> 
+#include <signal.h> 
 
 #include "../../lib/structs/message_struct.h"
 #include "../../lib/structs/sending_queue.h"
@@ -168,7 +170,7 @@ int main(int argc, char *argv[ ]) {
 				read(cmd_sock, buf, 1024 );
 				printf("buf %s.\n", buf);
 				//check se flag del messaggio ricevuto è un FIN
-				cmd = receive_packet(cmd_sock);
+				cmd = receive_packet(cmd_sock, NULL);
 				if (cmd -> flag & FIN){
 					printf("unlock select by cmd socket. exiting\n");
 					exit(EXIT_SUCCESS);

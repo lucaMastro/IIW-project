@@ -54,7 +54,7 @@ size_t receive_unconnected(int fd, FILE *write_here,
 //void receive_ack(int cmd_sock, Message *mex );
 void send_packet(int sockfd, Message *mex);
 int is_command_mex(Message *mex);
-Message *receive_packet(int sockfd);
+Message *receive_packet(int sockfd, struct timeval *time_out);
 
 //deserialize
 unsigned char *deserialize_seq_num(Message *mex, unsigned char *buffer);

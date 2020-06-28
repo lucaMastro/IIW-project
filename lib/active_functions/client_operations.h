@@ -63,7 +63,8 @@ void client_put_operation(int cmd_sock, int data_sock){
 	//stampa_mess(&put);
 
 	//wait for ack:
-	Message *ack = receive_packet(cmd_sock);
+	//ci va timeout
+	Message *ack = receive_packet(cmd_sock, NULL);
 
 	FILE *segment_file_transfert;
 	segment_file_transfert = fopen(complete_path, "rb"); // la b sta per binario, sennò la fread non funziona
@@ -145,7 +146,8 @@ void client_get_operation(int cmd_sock, int data_sock){
 		send_packet(cmd_sock, &get);
 		//stampa_mess(&get);
 
-		Message *ack = receive_packet(cmd_sock);
+		//ci va timeout
+		Message *ack = receive_packet(cmd_sock, NULL);
 		//ricevi messaggi	
 		int n = receive_data(data_sock, cmd_sock, new_file, NULL);
 		if (n < 0) {
@@ -182,8 +184,8 @@ void client_list_operation(int cmd_sock, int data_sock){
 		timeout.tv_sec = 1;
 		timeout.tv_usec = 0;
 
-		//attesa di ack + data
-		ack = receive_packet(cmd_sock);
+		//attesa di ack 
+		ack = receive_packet(cmd_sock, NULL);
 	}
 	while (ack == NULL || (ack -> flag & ACK) == 0);
 

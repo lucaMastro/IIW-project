@@ -6,5 +6,6 @@ typedef struct sending_queue{
 	int semaphore;
 	uint8_t next_seq_num;
 	int cmd_sock;
+	int data_sock;
 	int all_acked;
 }Sending_queue;
