@@ -1,3 +1,4 @@
+//#define _GNU_SOURCE 
 #include <sys/types.h> 
 #include <sys/socket.h> 
 #include <arpa/inet.h>
@@ -11,6 +12,8 @@
 #include <dirent.h>
 #include <sys/ipc.h>
 #include <sys/sem.h>
+#include <sys/types.h>
+#include <sys/syscall.h>
 extern int h_errno;
 
 #include "../../lib/structs/message_struct.h"

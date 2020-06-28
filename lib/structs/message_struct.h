@@ -23,7 +23,7 @@
 #define RECEIVE_WINDOW	8		
 #define MAX_SEQ_NUM 	255
 #define Tsec			5
-#define Tusec			0
+#define Tnsec			0
 //#define p 			
 
 

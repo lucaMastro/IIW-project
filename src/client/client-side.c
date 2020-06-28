@@ -9,7 +9,11 @@
 #include <fcntl.h>
 #include <pthread.h>
 #include <sys/time.h> 
+#include <time.h> 
 #include <signal.h> 
+#include <sys/types.h>
+#include <sys/syscall.h>
+
 
 #include "../../lib/structs/message_struct.h"
 #include "../../lib/structs/sending_queue.h"

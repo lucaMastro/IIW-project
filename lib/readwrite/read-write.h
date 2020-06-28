@@ -213,6 +213,7 @@ ssize_t receive_data(int data_sock, int cmd_sock, void *write_here,
 		//è possibile che arrivino pacchetti con solo header
 		if (mex -> seq_num == expected_seq_num){
 			
+			//if ( (mex -> seq_num == 2 || mex -> seq_num == 12) && test_timer == 0)
 			if (mex -> seq_num == 2 && test_timer == 0)
 				test_timer++;
 			else{
