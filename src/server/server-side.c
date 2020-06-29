@@ -36,10 +36,9 @@ extern int h_errno;
 
 struct thread_params{
 
-  int port_client;
-  int port_new_socket[2];
-  int thread_index;
+  int port_numbers[2];
   int semaphore;
+  int *array_port;
   //indirizzo ip mittente;
 };
 
@@ -56,19 +55,15 @@ int check_port(int port, int * array){
 
 void insert_new_port(int port, int *array){
 
-    static int position = 0; 
-    int i = 0;
+    int i;
 
-    array[position] = port; 
+	for (i = 0; i < MAX_PORT_NUMBER; i++){
+		if (array[i] == 0){
+			array[i] = port;
+			return;	
+		}
+	}
 
-    printf("Port numbers busy : \n");
-    while (array[i] != 0){ 
-      printf("%d\n", array[i]);
-      i++;
-    }
-
-    position ++;
-    return;
 }
 
 void generate_port(int *array_port, int *new_port_nums){
@@ -89,6 +84,7 @@ void generate_port(int *array_port, int *new_port_nums){
 }
 
 
+__thread int cmd_sock, data_sock;
 
 /*void timer_handler (int signum){
 
@@ -98,31 +94,37 @@ void generate_port(int *array_port, int *new_port_nums){
 }*/
 
 
+void delete_ports(int cmd_port, int data_port, int *array_ports){
+	int i;
+	for (i = 0; i < MAX_PORT_NUMBER; i++){
+		if (array_ports[i] == cmd_port || array_ports[i] == data_port){
+			array_ports[i] = 0;
+		}
+	}
+}
 
-void *thread_function(void * port){
+void *thread_function(void * params){
 	int semaphore;
 	struct itimerval timer;
-	struct thread_params *my_port;
+	struct thread_params *my_params;
 	int n;
 	int flag;
 	char *name_file;
+	int cmd_port, data_port;
 
-	int cmd_sock, data_sock;
 	struct sockaddr_in cmd_addr_thread, data_addr_thread;
 	struct sockaddr_in cmd_addr_client, data_addr_client;
 	const socklen_t size = sizeof(struct sockaddr_in);
 
 	signal(SIGALRM, timer_handler);  
 
-	my_port = (struct thread_params *) port;
-/*	printf("thread index: %d\nporta thread: %d\n",
-			my_port -> thread_index, 
-			//my_port -> port_client, 
-			my_port -> port_new_socket);*/
+	my_params = (struct thread_params *) params;
 
-	semaphore = my_port -> semaphore;
+	semaphore = my_params -> semaphore;
 	//struct sockaddr_in *cmd_addr_thread = malloc (sizeof(addr_thread));
 
+	cmd_port = my_params -> port_numbers[0]; 
+	data_port = my_params -> port_numbers[1]; 
 	//creo socket
 	if ((cmd_sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0) { 
 		perror("errore in socket_thread");
@@ -132,7 +134,7 @@ void *thread_function(void * port){
 	memset((void *)&cmd_addr_thread, 0, sizeof(cmd_addr_thread));
 	cmd_addr_thread.sin_family = AF_INET;
 	cmd_addr_thread.sin_addr.s_addr = htonl(INADDR_ANY); 
-	cmd_addr_thread.sin_port = htons(my_port -> port_new_socket[0]);
+	cmd_addr_thread.sin_port = htons(cmd_port);
 
 
 	/* assegna l'indirizzo al socket */
@@ -146,7 +148,7 @@ void *thread_function(void * port){
 	//creating a new socket for data.
 	data_addr_thread.sin_family = AF_INET;
 	data_addr_thread.sin_addr.s_addr = htonl(INADDR_ANY); 
-	data_addr_thread.sin_port = htons(my_port -> port_new_socket[1]);
+	data_addr_thread.sin_port = htons(data_port);
 
 	if ((data_sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0) { 
 		perror("errore in command sock");
@@ -165,11 +167,6 @@ void *thread_function(void * port){
 
 	//waiting for command
 	Message *cmd, ack;
-	/*Message *cmd = (Message*) malloc(sizeof(Message));
-	if (cmd ==NULL){
-		perror("error malloc");
-		exit(EXIT_FAILURE);
-	}*/
 
 	make_packet(&ack, NULL, 0, 0, ACK);
 	while(1){
@@ -219,12 +216,13 @@ void *thread_function(void * port){
 			case FIN:
 
 				printf("Exit case received\n");
-				//invio ack 
-				//
-				//
-				
-				
-				//rilascio delle risorse
+				close(cmd_sock);
+				close(data_sock);
+				free(name_file);
+				free(cmd);
+				delete_ports(cmd_port, data_port, my_params -> array_port);
+				free(my_params);
+				pthread_exit(0);
 		}
 
 		//it's allocate in each PUT-GET-LIST request
@@ -237,6 +235,12 @@ void *thread_function(void * port){
 	return NULL;
 }
 
+void initialize_array_port(int *array_port){
+	int i;
+	for (i = 0; i < MAX_PORT_NUMBER; i++){
+		array_port[i] = 0;
+	}
+}
 
 int main(int argc, char **argv) {
   
@@ -278,6 +282,7 @@ int main(int argc, char **argv) {
 	}
 
 	int array_port[MAX_PORT_NUMBER];
+	initialize_array_port(array_port);
 	struct thread_params thread_params;
 
 	Message *syn;
@@ -312,17 +317,15 @@ int main(int argc, char **argv) {
 		generate_port(array_port, new_port_nums);
 
 		//val = 0;
-		thread_params.port_new_socket[0] = new_port_nums[0];
-		thread_params.port_new_socket[1] = new_port_nums[1];
-		printf("my new ports: %u, %u\n", thread_params.port_new_socket[0],
-				thread_params.port_new_socket[1]);
+		thread_params.port_numbers[0] = new_port_nums[0];
+		thread_params.port_numbers[1] = new_port_nums[1];
+		printf("my new ports: %u, %u\n", thread_params.port_numbers[0],
+				thread_params.port_numbers[1]);
 
 
 		thread_params.semaphore = semaphore;
-		thread_params.thread_index = thread_count;
+		thread_params.array_port = array_port;
 		pthread_create(&tid, NULL, thread_function, (void *)&thread_params);
-		thread_count ++;
-
 
 		//6 bytes: num part <= 2^16 = 65536. 
 		//then 2 num ports: 10, 1 space, numbers and 1 '\0' 

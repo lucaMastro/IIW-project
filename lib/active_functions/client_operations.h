@@ -201,3 +201,15 @@ void client_list_operation(int cmd_sock, int data_sock){
 	 printf("list message content:\n%s.\n", list);
 	 free(list);
 }
+
+
+void client_exit_operation(int cmd_sock, int data_sock){
+	Message fin, *ack;
+	make_packet(&fin, NULL, 0, 0, FIN);
+	send_packet(cmd_sock, &fin, NULL);
+
+	//reading ack:
+	ack = receive_packet(cmd_sock, NULL);	
+	close(cmd_sock);
+	close(data_sock);
+}

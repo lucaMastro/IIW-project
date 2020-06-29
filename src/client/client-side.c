@@ -99,8 +99,8 @@ int main(int argc, char *argv[ ]) {
 				}
 			}
 			else{
-				//stdin:
-				if (fgets(command, MAX_CMD_SIZE, stdin) == NULL){
+				char *tmp;
+				if (fgets(command, MAX_CMD_SIZE, stdin) == NULL ){
 					exit(EXIT_SUCCESS); //ctrl+c. need handler
 				}				
 				
@@ -114,6 +114,7 @@ int main(int argc, char *argv[ ]) {
 					client_put_operation(cmd_sock, data_sock);
 				}
 				else if ( strstr(command, "exit")){
+					client_exit_operation(cmd_sock, data_sock);
 					exit(EXIT_SUCCESS);
 				}
 			}
