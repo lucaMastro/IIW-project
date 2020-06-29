@@ -161,7 +161,7 @@ ssize_t send_data(int data_sock, int cmd_sock, void *data, int type){
 		//incremento seq_num
 		queue -> next_seq_num = (queue -> next_seq_num + 1) % MAX_SEQ_NUM;
 
-		send_packet(sending_sock, mex);
+		send_packet(sending_sock, mex, NULL);
 		packet_sent ++;
 		
 		//save flag for exiting
@@ -223,7 +223,7 @@ ssize_t receive_data(int data_sock, int cmd_sock, void *write_here,
 			}
 		}
 
-		send_packet(cmd_sock, &ack);
+		send_packet(cmd_sock, &ack, NULL);
 	}
 	while ((flag & END_OF_DATA) != END_OF_DATA);
 		
@@ -258,112 +258,32 @@ void write_data(Message *mex, void *dest, unsigned char *src, int *str_len, int 
 	free(mex);
 }
 
-ssize_t send_unconnected(int fd, FILE *file_to_send, unsigned char *data_char, struct sockaddr_in *to, int type){
-	ssize_t bytes_sent = 0;
-	int len_ser = HEADER_SIZE;
-	unsigned char *tmp;
-
-	Message mex;
-	
-	do{
-		memset((void*) mex.list_data, 0, MSS);
-		if (data_char == NULL)
-			make_packet(&mex, file_to_send, 0,0, type);
-		else
-			data_char = (unsigned char*) make_packet(&mex, data_char, 0, 0, (CHAR_INDICATOR | type));
-		
-		len_ser += mex.length;
-		unsigned char *packet_ser = (unsigned char*) malloc(sizeof(unsigned char) * len_ser);
-		if (packet_ser == NULL){
-			perror("error in malloc");
-			exit(EXIT_FAILURE);
-		}
-		tmp = serialize_header(&mex, packet_ser);
-		memcpy(tmp, mex.list_data, mex.length);
-		
-		bytes_sent += writen(fd, len_ser, to, packet_ser);	
-
-		free(packet_ser);
-		len_ser = HEADER_SIZE;
-
-	} 
-	while( (mex.flag & END_OF_DATA) != END_OF_DATA ); //quando è == 1 ho inviato l'ultimo
-	
-	return bytes_sent;
-}
-
-size_t receive_unconnected(int fd, FILE *write_here, unsigned char **write_string_here, struct sockaddr_in *from, int *save_here_flag){
-	int max_size = HEADER_SIZE + MSS;
-	ssize_t n_read;
-	int str_len = 0;
-	int old_str_len;
-	unsigned char *tmp;
-	unsigned char *serialized = (unsigned char *) malloc(sizeof(char) * max_size);
-	if (serialized == NULL){
-		perror("error in malloc");
-		exit(EXIT_FAILURE);
-	}
-	memset((void*) serialized, 0, max_size);
-	
-	Message mex;
-	
-	do {
-		if (from != NULL){
-			socklen_t len = sizeof(*from);
-			n_read = recvfrom(fd, serialized, max_size, 0, (struct sockaddr*)from, &len);
-		}
-		else
-			n_read = recvfrom(fd, serialized, max_size, 0, NULL, NULL);
-
-		tmp = deserialize_header(&mex, serialized);
-
-		if (save_here_flag != NULL)
-			*save_here_flag = mex.flag;
-
-		if (mex.length > 0){
-			if ( (mex.flag & CHAR_INDICATOR) == CHAR_INDICATOR){
-				old_str_len = str_len;
-				str_len += mex.length;
-				
-				*write_string_here = (unsigned char*) realloc(*write_string_here, str_len);
-				if (*write_string_here == NULL){
-					perror("error in malloc");
-					exit(EXIT_FAILURE);
-				}
-
-				memcpy(*write_string_here + old_str_len, tmp, mex.length);
-			}
-			else
-				fwrite(tmp, 1, mex.length, write_here);
-			
-		}
-	}
-	//while(n_read == max_size);
-	while ((mex.flag & END_OF_DATA) != END_OF_DATA);
-
-	
-	return n_read;
-
-}
-
-
 int is_command_mex(Message *mex){
 	return (mex -> flag & (ACK | SYN | SYN_ACK | PUT | GET | LIST | FIN));
 }
 
 
-void send_packet(int sockfd, Message *mex){
+void send_packet(int sockfd, Message *mex, struct sockaddr_in *to){
 
 	int bytes_sent;
 	int max_size = HEADER_SIZE + mex -> length;	
 	unsigned char* packet_ser = serialize_message(mex);
 
-	bytes_sent += write(sockfd, packet_ser, max_size);
+	if (to == NULL)
+		bytes_sent = write(sockfd, packet_ser, max_size);
+	else
+		bytes_sent = sendto(sockfd, packet_ser, max_size, 0,
+				(struct sockaddr*)to, sizeof(*to));
+
+	if (bytes_sent < 0){
+		perror("error in sending bytes");
+		exit(EXIT_FAILURE);
+	}
 
 	free(packet_ser);
 }
 
-Message *receive_packet(int sockfd, struct timeval *time_out){
+Message *receive_packet(int sockfd, struct sockaddr_in *from){
 
 	ssize_t n_read;
 	int max_size = HEADER_SIZE + MSS;
@@ -375,24 +295,17 @@ Message *receive_packet(int sockfd, struct timeval *time_out){
 	}
 	memset((void*) serialized, 0, max_size);
 
-	if (time_out != NULL){
-		if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO,
-					(void*)time_out, sizeof(*time_out)) < 0){
-			perror("error setting timeout in receive packet");
-			exit(EXIT_FAILURE);
-		}
+	if (from == NULL)
+		n_read = read(sockfd, serialized, max_size);
+	else{
+		socklen_t len = sizeof(*from);
+		n_read = recvfrom(sockfd, serialized, max_size, 0,
+				(struct sockaddr*)from, &len);
 	}
 
-	if ( (n_read = read(sockfd, serialized, max_size)) < 0){
-		if (errno != EWOULDBLOCK && errno != EAGAIN){
-			perror("error in read");
-			exit(EXIT_FAILURE);
-			
-		}
-		else{
-			free(serialized);
-			return NULL;
-		}
+	if (n_read < 0){
+		perror("error in read");
+		exit(EXIT_FAILURE);		
 	}
 
 	//alloco la struttura in deserialize

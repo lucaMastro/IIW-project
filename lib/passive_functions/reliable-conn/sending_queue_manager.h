@@ -46,7 +46,7 @@ void retrasmission(Sending_queue *queue){
 	for (i = start_ind; i < start_ind + RECEIVE_WINDOW; i++){
 		m = queue -> on_fly_message_queue[i];
 		if ( m != NULL)
-			send_packet(queue -> data_sock, m);
+			send_packet(queue -> data_sock, m, NULL);
 		
 		else
 			break;

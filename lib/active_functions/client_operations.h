@@ -59,7 +59,7 @@ void client_put_operation(int cmd_sock, int data_sock){
 	//if (send_data(data_sock, cmd_sock, file_to_send, (PUT | CHAR_INDICATOR)) < 0){
 	Message put;
 	make_packet(&put, file_to_send, 0, 0, PUT |CHAR_INDICATOR);
-	send_packet(cmd_sock, &put);
+	send_packet(cmd_sock, &put, NULL);
 	//stampa_mess(&put);
 
 	//wait for ack:
@@ -143,7 +143,7 @@ void client_get_operation(int cmd_sock, int data_sock){
 
 		Message get;
 		make_packet(&get, file_to_get, 0, 0,GET |CHAR_INDICATOR);
-		send_packet(cmd_sock, &get);
+		send_packet(cmd_sock, &get, NULL);
 		//stampa_mess(&get);
 
 		//ci va timeout
@@ -179,7 +179,7 @@ void client_list_operation(int cmd_sock, int data_sock){
 
 	struct timeval timeout;
 	do{
-		send_packet(cmd_sock, &list_mex);
+		send_packet(cmd_sock, &list_mex, NULL);
 		printf("sent request\n");
 		timeout.tv_sec = 1;
 		timeout.tv_usec = 0;

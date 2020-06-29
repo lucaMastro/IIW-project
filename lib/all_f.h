@@ -28,8 +28,17 @@ void server_get_operation(int cmd_sock, int data_sock, char *file_requested);
 char *make_file_list();
 void server_list_operation(int cmd_sock, int data_sock);
 
-//passive.h
+//common-passive.h
 void stampa_mess(Message *mex);
+int connect_retry(int sockfd, struct sockaddr_in *addr, socklen_t alen,
+		Message *ack);
+
+//client-passive.h
+void send_syn(int sockfd, char *ip, int *new_ports);
+void make_connection(int sockfd, char *ip, int *cmd_sock, int *data_sock);
+//server-passive.h
+void timer_handler(int signo);
+void manage_connection_request(int cmd_sock, int data_sock);
 
 //reliable_conn
 void initialize_struct(Sending_queue *queue);
@@ -45,16 +54,9 @@ ssize_t receive_data(int data_sock, int cmd_sock, void *write_here,
 		int *save_here_flag);
 void write_data(Message *mex, void *dest, unsigned char *src, int *str_len,
 		int *old_str_len);
-ssize_t send_unconnected(int fd, FILE *file_to_send, unsigned char *data_char,
-		struct sockaddr_in *to, int type);
-size_t receive_unconnected(int fd, FILE *write_here, 
-		unsigned char **write_string_here, struct sockaddr_in *from, 
-		int *save_here_flag);
-//void send_ack(int cmd_sock, int ack_num);
-//void receive_ack(int cmd_sock, Message *mex );
-void send_packet(int sockfd, Message *mex);
+void send_packet(int sockfd, Message *mex, struct sockaddr_in *to);
 int is_command_mex(Message *mex);
-Message *receive_packet(int sockfd, struct timeval *time_out);
+Message *receive_packet(int sockfd, struct sockaddr_in *from);
 
 //deserialize
 unsigned char *deserialize_seq_num(Message *mex, unsigned char *buffer);
