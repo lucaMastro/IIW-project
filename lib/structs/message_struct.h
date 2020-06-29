@@ -22,8 +22,8 @@
 #define MSS				500
 #define RECEIVE_WINDOW	8		
 #define MAX_SEQ_NUM 	255
-#define Tsec			5
-#define Tnsec			0
+#define Tsec			0
+#define Tnsec			5000000 //5 ms
 //#define p 			
 
 

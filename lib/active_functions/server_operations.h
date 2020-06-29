@@ -141,11 +141,10 @@ char *make_file_list(){
 
 	int len = 0, old_len, curr_name_len;
 	char *file_list = NULL;
-	char *next_pos;
 
-	DIR *dir = opendir(SERVER_FOLDER);
 	struct dirent *file_info;
 
+	DIR *dir = opendir(SERVER_FOLDER);
 	if (dir == NULL){
 		perror("error opening directory");
 		exit(EXIT_FAILURE);
@@ -162,14 +161,13 @@ char *make_file_list(){
 		len += curr_name_len;
 		len++; //space beetwen names
 		
-		file_list = (char*)realloc(file_list, len);
+		file_list = (char*)realloc(file_list, len + 1);
 		if (file_list == NULL){
 			perror("error in realloc");
 			exit(EXIT_FAILURE);
 		}
-		next_pos = file_list + old_len;
-		strcpy(next_pos, file_info -> d_name);
-		strcpy(next_pos + len - 1, " ");
+		sprintf(file_list + old_len, "%s ", file_info -> d_name );
+		*(file_list + len) = '\0';
 
 	}
 

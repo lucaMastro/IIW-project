@@ -73,7 +73,6 @@ void *make_packet(Message *mess_to_fill, void *read_data_from_here, int seq_num,
 		mess_to_fill -> length = 0;
 
 	if (mess_to_fill -> length < MSS){
-		//printf("end of data set\n");
 		mess_to_fill -> flag += END_OF_DATA;
 	}
 
@@ -157,10 +156,6 @@ ssize_t send_data(int data_sock, int cmd_sock, void *data, int type){
 
 		sending_sock = (is_command_mex(mex) ) ? cmd_sock : data_sock;
 
-		//printf("send packet at %p:", mex);
-		//stampa_mess(mex);
-		printf("sent seq_num = %u\n", mex -> seq_num);
-
 		//store the message in the queue:
 		queue -> on_fly_message_queue[mex -> seq_num % RECEIVE_WINDOW]	= mex;
 		//incremento seq_num
@@ -179,7 +174,6 @@ ssize_t send_data(int data_sock, int cmd_sock, void *data, int type){
 		perror("error in join");
 		exit(EXIT_FAILURE);
 	}
-	printf("joined\n");
 	free(queue);
 	return bytes_sent;
 }
@@ -213,8 +207,8 @@ ssize_t receive_data(int data_sock, int cmd_sock, void *write_here,
 		//è possibile che arrivino pacchetti con solo header
 		if (mex -> seq_num == expected_seq_num){
 			
-			//if ( (mex -> seq_num == 2 || mex -> seq_num == 12) && test_timer == 0)
-			if (mex -> seq_num == 2 && test_timer == 0)
+			if ( (mex -> seq_num == 2 || mex -> seq_num == 12) && test_timer == 0)
+			//if (mex -> seq_num == 2 && test_timer == 0)
 				test_timer++;
 			else{
 				if (mex -> length > 0){
@@ -229,9 +223,6 @@ ssize_t receive_data(int data_sock, int cmd_sock, void *write_here,
 			}
 		}
 
-		printf("sending ack:");
-		stampa_mess(&ack);
-		printf("\n");
 		send_packet(cmd_sock, &ack);
 	}
 	while ((flag & END_OF_DATA) != END_OF_DATA);
@@ -254,7 +245,10 @@ void write_data(Message *mex, void *dest, unsigned char *src, int *str_len, int 
 			perror("error in malloc");
 			exit(EXIT_FAILURE);	
 		}
-		memcpy( (*str_dest) + (*old_str_len), src, mex -> length);
+		//memcpy( (*str_dest) + (*old_str_len), src, mex -> length);
+		memcpy( (*str_dest) + (*old_str_len), mex -> list_data, 
+				mex -> length);
+
 		*(*str_dest + *str_len) = '\0';
 	}
 	else{
@@ -287,21 +281,14 @@ ssize_t send_unconnected(int fd, FILE *file_to_send, unsigned char *data_char, s
 		tmp = serialize_header(&mex, packet_ser);
 		memcpy(tmp, mex.list_data, mex.length);
 		
-		/*if (data_char != NULL){
-			printf("datachar = %s\ntmp[data] = %s\n", data_char, tmp);
-		}*/
-
 		bytes_sent += writen(fd, len_ser, to, packet_ser);	
-		//printf("bytes sent = %lu\n", bytes_sent);
-		//printf("flag = %u\n\n", mex.flag);
 
 		free(packet_ser);
 		len_ser = HEADER_SIZE;
 
-	} //while(mex.length == MSS);
+	} 
 	while( (mex.flag & END_OF_DATA) != END_OF_DATA ); //quando è == 1 ho inviato l'ultimo
 	
-	printf("bytes sent = %lu\n", bytes_sent);
 	return bytes_sent;
 }
 
@@ -330,7 +317,6 @@ size_t receive_unconnected(int fd, FILE *write_here, unsigned char **write_strin
 
 		tmp = deserialize_header(&mex, serialized);
 
-		//printf("received flag = %u\n", mex.flag);
 		if (save_here_flag != NULL)
 			*save_here_flag = mex.flag;
 
@@ -345,8 +331,6 @@ size_t receive_unconnected(int fd, FILE *write_here, unsigned char **write_strin
 					exit(EXIT_FAILURE);
 				}
 
-				//strcpy((char*) write_string_here, (char *)tmp);	
-				//printf("tmp = %s\n", tmp);
 				memcpy(*write_string_here + old_str_len, tmp, mex.length);
 			}
 			else
@@ -392,7 +376,6 @@ Message *receive_packet(int sockfd, struct timeval *time_out){
 	memset((void*) serialized, 0, max_size);
 
 	if (time_out != NULL){
-		printf("setto timer\n");
 		if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO,
 					(void*)time_out, sizeof(*time_out)) < 0){
 			perror("error setting timeout in receive packet");
@@ -408,7 +391,6 @@ Message *receive_packet(int sockfd, struct timeval *time_out){
 		}
 		else{
 			free(serialized);
-			printf("im returning null\n");
 			return NULL;
 		}
 	}
