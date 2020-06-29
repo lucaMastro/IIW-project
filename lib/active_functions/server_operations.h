@@ -53,6 +53,9 @@ int check_for_existing_file(int semaphore, char *path,
 	else if (ret_access == 0){ //the file still exist
 		printf("file still exist\n");
 		//rinonimo file e continuo
+		free(complete_path);
+		//printf("new file name: %s\n", change_name(path, SERVER_FOLDER));
+		complete_path = change_name(path, SERVER_FOLDER);
 	}
 
 	*to_create = fopen(complete_path, "w+");

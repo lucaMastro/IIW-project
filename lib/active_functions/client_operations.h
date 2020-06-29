@@ -10,22 +10,12 @@
 
 extern int h_errno;
 
-void client_put_operation(int cmd_sock, int data_sock){
-	char *file_to_send, *complete_path;
+void client_put_operation(int cmd_sock, int data_sock, char *file_to_send,
+		char *server_name){
+	char *complete_path;
 	int res_scan;
 	int len = strlen(CLIENT_FOLDER);
 	
-	printf("What file do you want to upload ?\n");
-	do{
-		if ( (res_scan = scanf("%ms", &file_to_send)) < 0 && errno != EINTR){
-			perror("error in scanf");
-			exit(EXIT_FAILURE);
-		}
-		if (res_scan == 0)
-			printf("input not valid\n");
-	}
-	while(res_scan  == 0);
-
 	len += strlen(file_to_send) ;
 
 	complete_path = (char *) malloc(sizeof(char) * len);
@@ -34,8 +24,7 @@ void client_put_operation(int cmd_sock, int data_sock){
 		exit(EXIT_FAILURE);
 	}
 	memset((void*) complete_path, 0, len);
-	strcat(complete_path, CLIENT_FOLDER);
-	strcat(complete_path, file_to_send);
+	sprintf(complete_path, "%s%s", CLIENT_FOLDER, file_to_send);
 
 	printf("looking for %s\n", complete_path);
 
@@ -52,62 +41,39 @@ void client_put_operation(int cmd_sock, int data_sock){
 
 	}
 
-	//check se lunghezza > MSS in caso impossibile inviare
-
-
-	//invio comando: invio solo il nome del file, non l'intero apth
-	//if (send_data(data_sock, cmd_sock, file_to_send, (PUT | CHAR_INDICATOR)) < 0){
 	Message put;
-	make_packet(&put, file_to_send, 0, 0, PUT |CHAR_INDICATOR);
+	make_packet(&put, server_name, 1, 0, PUT |CHAR_INDICATOR);
 	send_packet(cmd_sock, &put, NULL);
-	//stampa_mess(&put);
-
-	//wait for ack:
-	//ci va timeout
 	Message *ack = receive_packet(cmd_sock, NULL);
 
 	FILE *segment_file_transfert;
-	segment_file_transfert = fopen(complete_path, "rb"); // la b sta per binario, sennò la fread non funziona
-					
+	segment_file_transfert = fopen(complete_path, "rb");					
+
 	if (send_data(data_sock, cmd_sock, segment_file_transfert, 0) < 0){
 		perror("errore in sendto");
 		exit(1);
 	}
-	free(file_to_send);
+
 	free(complete_path);
 }
 
 
 
-void client_get_operation(int cmd_sock, int data_sock){
+void client_get_operation(int cmd_sock, int data_sock, char *file_to_get, 
+		char *local_name){
 
-	char *file_to_get;
 	char *complete_path;
 	int len = strlen(CLIENT_FOLDER);
-	int res_scan;
 	int ret_access;
 
-	printf("Which file you want to download ?\n");
-	do{
-		if ( (res_scan = scanf("%ms", &file_to_get)) < 0 && errno != EINTR){
-			perror("error in scanf");
-			exit(EXIT_FAILURE);
-		}
-		if (res_scan == 0)
-			printf("input not valid\n");
-	}
-	while(res_scan  == 0);
-
-
-	len += strlen(file_to_get);
-	complete_path = (char *) malloc(sizeof(char) * len);
+	len += strlen(local_name);
+	complete_path = (char *) malloc(sizeof(char) * len + 1);
 	if (complete_path == NULL){
 		perror("error in malloc");
 		exit(EXIT_FAILURE);
 	}
-	memset((void*) complete_path, 0, len);
-	strcat(complete_path, CLIENT_FOLDER);
-	strcat(complete_path, file_to_get);
+	memset((void*) complete_path, 0, len + 1);
+	sprintf(complete_path, "%s%s", CLIENT_FOLDER, local_name);
 
 	//controllo se non è già presente nel client
 	if ((ret_access = access(complete_path, F_OK)) == -1 &&
@@ -130,34 +96,25 @@ void client_get_operation(int cmd_sock, int data_sock){
 		exit(1);		
 	}	
 
-
 	//invio comando con nome
 
+	Message get;
+	make_packet(&get, file_to_get, 0, 0,GET |CHAR_INDICATOR);
+	send_packet(cmd_sock, &get, NULL);
+	//stampa_mess(&get);
 
-//	while(1){
-
-	/*	if (send_data(data_sock, cmd_sock, file_to_get, GET | CHAR_INDICATOR) < 0){
-			perror("errore in sendto");
-			exit(1);
-		}*/
-
-		Message get;
-		make_packet(&get, file_to_get, 0, 0,GET |CHAR_INDICATOR);
-		send_packet(cmd_sock, &get, NULL);
-		//stampa_mess(&get);
-
-		//ci va timeout
-		Message *ack = receive_packet(cmd_sock, NULL);
-		//ricevi messaggi	
-		int n = receive_data(data_sock, cmd_sock, new_file, NULL);
-		if (n < 0) {
-			perror("errore in thread_recvfrom");
-			exit(1);	
-		}
+	//ci va timeout
+	Message *ack = receive_packet(cmd_sock, NULL);
+	//ricevi messaggi	
+	int n = receive_data(data_sock, cmd_sock, new_file, NULL);
+	if (n < 0) {
+		perror("errore in thread_recvfrom");
+		exit(1);	
+	}
 //	}
 
 	fclose(new_file);
-	free(file_to_get);
+	//free(file_to_get);
 	free(complete_path);
 }
 

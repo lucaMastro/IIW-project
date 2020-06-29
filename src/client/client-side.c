@@ -33,10 +33,61 @@
 
 
 
+void manage_cmd_line(char *command, int data_sock, int cmd_sock){
+	
+	char *list[4];
+	if (fgets(command, MAX_CMD_SIZE, stdin) == NULL){
+		client_exit_operation(cmd_sock, data_sock);
+		exit(EXIT_SUCCESS); //ctrl+c. need handler
+	}				
+	else{
+		command[strlen(command) - 1] = '\0'; //eliminating \n
+		for (int i = 0; i < 4; i++)
+			list[i] = NULL;
+
+		list[0] = strtok(command, " ");
+		for (int i = 1; i < 4; i++)
+			list[i] = strtok(NULL, " ");
+		
+
+		if ( !strcmp(list[0], "ls") ){
+			if (list[1] == NULL)
+				client_list_operation(cmd_sock, data_sock);
+			else
+				show_man(0);
+		}
+
+		else if ( !strcmp(list[0], "get") ){
+			if (list[1] != NULL && list[2] != NULL 
+					&& list[3] == NULL)
+				client_get_operation(cmd_sock, data_sock, list[1], list[2]);
+			else
+				show_man(1);
+		}
+
+		else if ( !strcmp(list[0], "put") ){
+			if (list[1] != NULL && list[2] != NULL 
+					&& list[3] == NULL)
+				client_put_operation(cmd_sock, data_sock, list[1], list[2]);
+			else
+				show_man(2);
+		}
+		else if ( !strcmp(list[0], "exit") ){
+			if (list[1] == NULL){
+				client_exit_operation(cmd_sock, data_sock);
+				exit(EXIT_SUCCESS);
+			}
+			else
+				show_man(3);
+		}
+	}
+}
+
 int main(int argc, char *argv[ ]) {
+	
+	
 	int sockfd, cmd_sock, data_sock;
 	struct sockaddr_in servaddr, cmd_server_addr, data_server_addr;
-//	int command;
 	char command[MAX_CMD_SIZE];
 
 	if (argc != 2) { /* controlla numero degli argomenti */
@@ -63,64 +114,89 @@ int main(int argc, char *argv[ ]) {
 
 	
 	printf("cmd_sock = %d\ndata_sock = %d\n", cmd_sock, data_sock);
-		fd_set read_set;
-		FD_ZERO(&read_set);
-		int maxfd;
-		Message *cmd;
-		printf("Welcome to udt-reliable go-back-n ftp protocol.\n");
-		while (1){
-			//memset((void*) command, 0, MAX_CMD_SIZE);
-			printf("\nftp > ");
-			fflush(stdout);
-			FD_SET(cmd_sock, &read_set);
-			FD_SET(fileno(stdin), &read_set);
+	fd_set read_set;
+	FD_ZERO(&read_set);
+	int maxfd;
+	Message *cmd;
+	printf("Welcome to udt-reliable go-back-n ftp protocol.\n");
+	while (1){
+		//memset((void*) command, 0, MAX_CMD_SIZE);
+		printf("\nftp > ");
+		fflush(stdout);
+		FD_SET(cmd_sock, &read_set);
+		FD_SET(fileno(stdin), &read_set);
 
-			maxfd = fileno(stdin) < cmd_sock ? 
-				(cmd_sock + 1) : (fileno(stdin) + 1);
+		maxfd = fileno(stdin) < cmd_sock ? 
+			(cmd_sock + 1) : (fileno(stdin) + 1);
 
-			//l'ultimo parametro è struct timeval, per un timer
-			if (select(maxfd, &read_set, NULL, NULL, NULL) < 0){
-				perror("error in select");
-				exit(EXIT_FAILURE);
-			}
-
-			printf("select unlocked\n");
-			
-			if (FD_ISSET(cmd_sock, &read_set)){
-				char buf[1024];
-				read(cmd_sock, buf, 1024 );
-				printf("buf %s.\n", buf);
-				//check se flag del messaggio ricevuto è un FIN
-				cmd = receive_packet(cmd_sock, NULL);
-				if (cmd -> flag & FIN){
-					printf("unlock select by cmd socket. exiting\n");
-					exit(EXIT_SUCCESS);
-					
-				}
-			}
-			else{
-				char *tmp;
-				if (fgets(command, MAX_CMD_SIZE, stdin) == NULL ){
-					exit(EXIT_SUCCESS); //ctrl+c. need handler
-				}				
-				
-				if ( strstr(command, "ls"))
-					client_list_operation(cmd_sock, data_sock);
-				
-				else if ( strstr(command, "get\n")){
-					client_get_operation(cmd_sock, data_sock);
-				}
-				else if ( strstr(command, "put")){
-					client_put_operation(cmd_sock, data_sock);
-				}
-				else if ( strstr(command, "exit")){
-					client_exit_operation(cmd_sock, data_sock);
-					exit(EXIT_SUCCESS);
-				}
-			}
-
+		//l'ultimo parametro è struct timeval, per un timer
+		if (select(maxfd, &read_set, NULL, NULL, NULL) < 0){
+			perror("error in select");
+			exit(EXIT_FAILURE);
 		}
-	
+
+		printf("select unlocked\n");
+			
+		if (FD_ISSET(cmd_sock, &read_set)){
+			//check se flag del messaggio ricevuto è un FIN
+			cmd = receive_packet(cmd_sock, NULL);
+			if (cmd -> flag & FIN){
+				printf("unlock select by cmd socket. exiting\n");
+				exit(EXIT_SUCCESS);
+			}
+		}
+		else
+			manage_cmd_line(command, data_sock, cmd_sock);
+	}
 
 	exit(0);
 }
+
+
+					/*tmp = strtok(command, " ");		
+					
+					if ( strcmp(tmp, "ls") == 0){ //first param ls
+						//i don't need more tokens:
+						if ( (tmp = strtok(NULL, " ")) != NULL ) 
+							client_list_operation(cmd_sock, data_sock);
+						else
+							show_man(0);
+					}
+				
+					else if ( strcmp(tmp, "get") == 0){
+						name_on_server = strtok(NULL, " ");
+						if (name_on_server != NULL){
+							name_on_local = strtok(NULL, " ");
+							if (name_on_local != NULL && 
+									tmp = strtok(NULL, " ")) //no other par
+								client_get_operation(cmd_sock, data_sock);
+							else
+								show_man(1);
+						else
+							show_man(1);	
+					}
+					else if ( strcmp(tmp, "put") == 0){
+						name_on_local = strtok(NULL, " ");
+						if (name_on_local != NULL){
+							name_on_server = strtok(NULL, " ");
+							if (name_on_server != NULL && 
+									tmp = strtok(NULL, " ")) //no other par
+								client_put_operation(cmd_sock, data_sock);
+							else
+								show_man(2);
+						else
+							show_man(2);	
+					}
+					else if ( strcmp(command, "exit") == 0){
+						if ( (tmp = strtok(NULL, " ")) != NULL ) {
+							client_exit_operation(cmd_sock, data_sock);
+							exit(EXIT_SUCCESS);
+						}
+						else
+							show_man(3);
+					}
+				}*/
+	
+
+
+

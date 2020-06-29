@@ -34,13 +34,13 @@ extern int h_errno;
 #define MAX_PORT_NUMBER 200
 #define SERVER_FOLDER "src/server/server-files/"
 
-struct thread_params{
+typedef struct thread_params{
 
   int port_numbers[2];
   int semaphore;
   int *array_port;
   //indirizzo ip mittente;
-};
+} Thread_params;
 
 
 
@@ -247,7 +247,6 @@ int main(int argc, char **argv) {
 	struct sockaddr_in addr;
 	int sockfd;
 	pthread_t tid;
-	int thread_count = 0; 
     int new_port_nums[2];
 	int flag;
 	int semaphore; //sempahore to check name files in put requests
@@ -283,11 +282,18 @@ int main(int argc, char **argv) {
 
 	int array_port[MAX_PORT_NUMBER];
 	initialize_array_port(array_port);
-	struct thread_params thread_params;
 
 	Message *syn;
 	Message syn_ack;
 	while (1) {
+		
+		Thread_params *params = (Thread_params *)
+			malloc(sizeof(Thread_params));
+		if (params == NULL){
+			perror("error in malloc params");
+			exit(EXIT_FAILURE);
+		}
+		memset((void*) params, 0, sizeof(Thread_params));
 
 		memset((void*) &syn_ack, 0, sizeof(Message));
 		struct sockaddr_in *client_addr;
@@ -317,15 +323,15 @@ int main(int argc, char **argv) {
 		generate_port(array_port, new_port_nums);
 
 		//val = 0;
-		thread_params.port_numbers[0] = new_port_nums[0];
-		thread_params.port_numbers[1] = new_port_nums[1];
-		printf("my new ports: %u, %u\n", thread_params.port_numbers[0],
-				thread_params.port_numbers[1]);
+		params -> port_numbers[0] = new_port_nums[0];
+		params -> port_numbers[1] = new_port_nums[1];
+		printf("my new ports: %u, %u\n", params -> port_numbers[0],
+				params -> port_numbers[1]);
 
 
-		thread_params.semaphore = semaphore;
-		thread_params.array_port = array_port;
-		pthread_create(&tid, NULL, thread_function, (void *)&thread_params);
+		params -> semaphore = semaphore;
+		params -> array_port = array_port;
+		pthread_create(&tid, NULL, thread_function, (void *)params);
 
 		//6 bytes: num part <= 2^16 = 65536. 
 		//then 2 num ports: 10, 1 space, numbers and 1 '\0' 

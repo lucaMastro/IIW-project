@@ -15,8 +15,10 @@
 #include <stdio.h>
 
 //active client
-void client_put_operation(int cmd_sock, int data_sock);
-void client_get_operation(int cmd_sock, int data_sock);
+void client_put_operation(int cmd_sock, int data_sock, char *server_name, 
+		char *local_name);
+void client_get_operation(int cmd_sock, int data_sock, char *server_name, 
+		char *local_name);
 void client_list_operation(int cmd_sock, int data_sock);
 
 //active server

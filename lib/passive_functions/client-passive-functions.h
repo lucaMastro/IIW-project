@@ -59,6 +59,7 @@ void make_connection(int sockfd, char *ip, int *cmd_sock, int *data_sock){
 		exit(EXIT_FAILURE);
 	}
 
+
 	make_packet(&ack, NULL, 0, 0, ACK);
 	
 	if (connect_retry(*cmd_sock, &cmd_server_addr, 
@@ -78,3 +79,39 @@ void make_connection(int sockfd, char *ip, int *cmd_sock, int *data_sock){
 }
 
 
+void show_man(int kind){
+	//man for ls:
+	//if kind = 1 --> ls
+	//if kind = 2 --> get
+	//if kind = 3 --> put
+	
+	switch(kind){
+		case (0):
+			printf("Usage of List Command\n");
+			printf("=====================\n\n");
+
+			printf("ftp> ls\n\n");
+			break;
+		case (1):
+			printf("Usage of Get Command\n");
+			printf("====================\n\n");
+
+			printf("ftp> get <file_name_on_server> <file_name_in_local>\n");
+			printf("take care: the destination folder is standard: client-file\n\n");
+			break;
+		case (2):
+			printf("Usage of Put Command\n");
+			printf("====================\n\n");
+
+			printf("ftp> put <file_name_in_local> <file_name_on_server>\n");
+			printf("take care: the source folder is standard: client-file\n\n");
+			break;		
+		case (3):
+			printf("Usage of Exit Command\n");
+			printf("=====================\n\n");
+
+			printf("ftp> exit\n");
+			break;		
+
+	}
+}
