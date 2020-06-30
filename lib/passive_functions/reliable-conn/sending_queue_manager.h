@@ -51,20 +51,10 @@ void retrasmission(Sending_queue *queue){
 			printf("packet %u\n\n", m -> seq_num);
 			if (!is_packet_lost())
 				send_packet(queue -> data_sock, m, NULL);
+			printf("rx seq_num = %u\n", m -> seq_num);
 		}
 		else
 			break;
-	/*	if ( m != NULL && !is_packet_lost() ){
-			send_packet(queue -> data_sock, m, NULL);
-	//		printf("packet %u sent correctly\n\n", m -> seq_num);
-		}	
-		else
-	i		if (m != NULL)
-	//			printf("packet %u not sent\n\n", m -> seq_num);
-	//		else
-	//			break;
-			if (m == NULL)
-				break;*/
 	}
 
 	struct itimerspec restart_timer;
@@ -84,16 +74,15 @@ void retrasmission(Sending_queue *queue){
 
 
 void retrasmission_handler(int signo){
+	printf("timed out\n");
 	retrasmission(queue);
 }
 
 
 void *waiting_for_ack(void *q){
-	//Sending_queue *queue = (Sending_queue*) q;
 	queue = (Sending_queue*) q;
 
 	int sem = queue -> semaphore;
-	int flag = 0;
 	int new_send_base = 0;
 	int freeding_pos;
 	int was_last;
@@ -126,7 +115,6 @@ void *waiting_for_ack(void *q){
 	stop_timer.it_interval.tv_sec = 0;
 	stop_timer.it_interval.tv_nsec = 0;
 
-//	struct itimerspec timer;
 
 	if (timer_create(CLOCK_REALTIME, &se, &timer_id) < 0){
 		perror("error in timer_create");
@@ -137,7 +125,9 @@ void *waiting_for_ack(void *q){
 		perror("error in starting timer");
 		exit(EXIT_FAILURE);
 	}
+	printf("timer started\n");
 
+	printf("thread rx on sock %d\n", queue -> cmd_sock);
 	do{
 
 		ack = receive_packet(queue -> cmd_sock, NULL);
@@ -181,7 +171,6 @@ void *waiting_for_ack(void *q){
 				perror("error unlocking semaphore");
 				exit(EXIT_FAILURE);
 			}
-//			printf("coin released\n");
 			if (timer_settime(timer_id, 0, &start_timer, NULL) < 0){
 				perror("error in starting timer");
 				exit(EXIT_FAILURE);
@@ -189,9 +178,9 @@ void *waiting_for_ack(void *q){
 		}
 
 		free(ack);
-		//ack = NULL;
-
 	}while(was_last == 0); //ho ricevuto ack dell'ultimo
 
+	timer_delete(timer_id);
+	free(queue);
 	pthread_exit(NULL);
 }

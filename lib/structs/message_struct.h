@@ -23,7 +23,7 @@
 #define MAX_SEQ_NUM 	255
 #define RECEIVE_WINDOW	8		
 #define Tsec			0
-#define Tnsec			5000000 //5 ms
+#define Tnsec			200000000 //200 ms
 #define p 				40 //40% lost	
 
 

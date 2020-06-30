@@ -86,13 +86,11 @@ void server_put_operation(int cmd_sock, int data_sock, char *file_name, int sem_
 		exit(EXIT_FAILURE);	
 	}
 
-	//n = receive_data(data_sock, cmd_sock, file_received, NULL);
 	receive_data(data_sock, cmd_sock, file_received, NULL);
-	/*if (n < 0) {
-		perror("errore in thread_recvfrom");
-		exit(EXIT_FAILURE);	
-	}*/	
-	fclose(file_received);
+	if (fclose(file_received) == EOF){
+		perror("error closing file in put");
+		exit(EXIT_FAILURE);
+	}
 }
 
 void server_get_operation(int cmd_sock, int data_sock, char *file_requested){
@@ -106,8 +104,10 @@ void server_get_operation(int cmd_sock, int data_sock, char *file_requested){
 		exit(EXIT_FAILURE);
 	}
 	memset((void*) complete_path, 0, len);
-	strcat(complete_path, SERVER_FOLDER);
-	strcat(complete_path, file_requested);
+	//strcat(complete_path, SERVER_FOLDER);
+	//strcat(complete_path, file_requested);
+	sprintf(complete_path, "%s%s", SERVER_FOLDER, file_requested);
+	printf("ok\n");
 	
 	//verifico se il file esiste effettivamente
 	if(access(complete_path, F_OK) == -1){
@@ -129,7 +129,10 @@ void server_get_operation(int cmd_sock, int data_sock, char *file_requested){
 		perror("errore in sendto");
 		exit(EXIT_FAILURE);
 	}
-	//attesa ack
+	if (fclose(file_to_send) == EOF){
+		perror("error closing file in get");
+		exit(EXIT_FAILURE);
+	}
 }
 
 
@@ -167,6 +170,10 @@ char *make_file_list(){
 
 	}
 
+	if (closedir(dir) < 0){
+		perror("error closing dir"); 
+		exit(EXIT_FAILURE);
+	}
 	return file_list;
 
 }

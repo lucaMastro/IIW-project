@@ -115,16 +115,9 @@ void client_get_operation(int cmd_sock, int data_sock, char *file_to_get,
 		exit(EXIT_FAILURE);
 	}
 	//ricevi messaggi	
-	//int n = receive_data(data_sock, cmd_sock, new_file, NULL);
 	receive_data(data_sock, cmd_sock, new_file, NULL);
-/*	if (n < 0) {
-		perror("errore in thread_recvfrom");
-		exit(1);	
-	}*/
-//	}
 
 	fclose(new_file);
-	//free(file_to_get);
 	free(complete_path);
 	//leggere exit code, se fallisce elimina file
 }
@@ -147,13 +140,7 @@ void client_list_operation(int cmd_sock, int data_sock){
 	unsigned char *list = NULL;
 
 	receive_data(data_sock, cmd_sock, &list, NULL );
-	/*if (receive_data(data_sock, cmd_sock, &list, NULL ) < 0) {
-		perror("errore in recvfrom");
-		exit(1);
-	}*/
-
 	//stampo contenuto
-	 //printf("list message content:\n%s.\n", list);
 	 printf("%s\n", list);
 	 free(list);
 }

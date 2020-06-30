@@ -84,7 +84,6 @@ int is_packet_lost(){
 	int n =  rand() % 101 ; 
 	printf("random: %d\n", n);
 	return ( n < p); 
-	//return ( (rand() % 102 ) < p); 
 	//n = rand() %101 => n in [0, 100]
 	//n < p with prob p.
 }
@@ -94,7 +93,7 @@ ssize_t send_data(int data_sock, int cmd_sock, void *data, int type){
 	ssize_t bytes_sent = 0;
 	int len_ser = HEADER_SIZE;
 	unsigned char *tmp, *new_data_pointer = (unsigned char*) data;
-	int flag;
+	int flag = 0;
 	int sending_sock;
 
 //	int packet_sent = 0;
@@ -172,20 +171,15 @@ ssize_t send_data(int data_sock, int cmd_sock, void *data, int type){
 		//incremento seq_num
 		queue -> next_seq_num = (queue -> next_seq_num + 1) % MAX_SEQ_NUM;
 
-		if ( !is_packet_lost() ){
-		//	printf("packet %u sent correctly\n\n", mex -> seq_num);
+		if ( !is_packet_lost() )
 			send_packet(sending_sock, mex, NULL);
-		}
-		//else
-		//	printf("packet %u not sent\n\n", mex -> seq_num);
+		
 		printf("packet %u\n\n", mex -> seq_num);
 
-	//	packet_sent ++;
-		
 		//save flag for exiting
 		flag = mex -> flag;
 		
-	} //while(mex.length == MSS);
+	} 
 	while( (flag & END_OF_DATA) != END_OF_DATA ); //quando è == 1 ho inviato l'ultimo	
 
 	if (pthread_join(tid, NULL) < 0){
@@ -197,12 +191,10 @@ ssize_t send_data(int data_sock, int cmd_sock, void *data, int type){
 }
 
 
-//ssize_t receive_data(int data_sock, int cmd_sock, void *write_here, 
 void receive_data(int data_sock, int cmd_sock, void *write_here, 
 		int *save_here_flag){
 
 	int max_size = HEADER_SIZE + MSS;
-	//ssize_t n_read = 0;
 	int str_len = 0;
 	int old_str_len;
 	uint16_t flag = 0;
@@ -231,19 +223,12 @@ void receive_data(int data_sock, int cmd_sock, void *write_here,
 		//è possibile che arrivino pacchetti con solo header
 		if (mex -> seq_num == expected_seq_num){
 			flag = mex -> flag;
-			
-		/*	if ( (mex -> seq_num == 2 || mex -> seq_num == 12) && test_timer == 0)
-			//if (mex -> seq_num == 2 && test_timer == 0)
-				test_timer++;
-			else{*/
-				if (mex -> length > 0){
-					//write_data(mex, write_here, tmp, &str_len, &old_str_len);	
-					write_data(mex, write_here, mex -> list_data, &str_len, &old_str_len);	
-		//		}	
+			if (mex -> length > 0){
+				write_data(mex, write_here, mex -> list_data, 
+						&str_len, &old_str_len);	
 
 				ack.ack_num = expected_seq_num; 
 				expected_seq_num = (expected_seq_num + 1) % MAX_SEQ_NUM;
-				
 			}
 		}
 
@@ -259,7 +244,6 @@ void receive_data(int data_sock, int cmd_sock, void *write_here,
 	struct timeval to;
 	to.tv_sec = Tsec <<2;
 	to.tv_usec = (Tnsec / 1000)<<2; //nano secs to micro secs
-	//set a timer equals timeout
 	while(1){
 		setsockopt(data_sock, SOL_SOCKET, SO_RCVTIMEO, &to, sizeof(to));
 		Message *m = receive_packet(data_sock, NULL);
