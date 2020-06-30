@@ -19,6 +19,10 @@ void send_syn(int sockfd, char *ip, int *new_ports){
 
 	//waiting for synack
 	syn_ack = receive_packet(sockfd, NULL);
+	if (syn_ack == NULL){
+		perror("error receiving syn_ack");
+		exit(EXIT_FAILURE);
+	}
 
 	tmp = strtok((char*) syn_ack -> list_data, " ");
 	cmd_port = atoi(tmp);

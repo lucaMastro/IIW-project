@@ -44,6 +44,10 @@ void client_put_operation(int cmd_sock, int data_sock, char *file_to_send,
 	make_packet(&put, server_name, 1, 0, PUT |CHAR_INDICATOR);
 	send_packet(cmd_sock, &put, NULL);
 	Message *ack = receive_packet(cmd_sock, NULL);
+	if (ack == NULL){
+		perror("error receiving ack");
+		exit(EXIT_FAILURE);
+	}
 
 	FILE *segment_file_transfert;
 	segment_file_transfert = fopen(complete_path, "rb");					
@@ -106,6 +110,10 @@ void client_get_operation(int cmd_sock, int data_sock, char *file_to_get,
 
 	//ci va timeout
 	Message *ack = receive_packet(cmd_sock, NULL);
+	if (ack == NULL){
+		perror("error receiving ack");
+		exit(EXIT_FAILURE);
+	}
 	//ricevi messaggi	
 	int n = receive_data(data_sock, cmd_sock, new_file, NULL);
 	if (n < 0) {
@@ -136,6 +144,10 @@ void client_list_operation(int cmd_sock, int data_sock){
 
 		//attesa di ack 
 		ack = receive_packet(cmd_sock, NULL);
+		if (ack == NULL){
+			perror("error receiving ack");
+			exit(EXIT_FAILURE);
+		}
 	}
 	while (ack == NULL || (ack -> flag & ACK) == 0);
 
@@ -160,6 +172,10 @@ void client_exit_operation(int cmd_sock, int data_sock){
 
 	//reading ack:
 	ack = receive_packet(cmd_sock, NULL);	
+	if (ack == NULL){
+		perror("error receiving ack");
+		exit(EXIT_FAILURE);
+	}
 	close(cmd_sock);
 	close(data_sock);
 }

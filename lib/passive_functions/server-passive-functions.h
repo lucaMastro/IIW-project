@@ -41,6 +41,10 @@ void manage_connection_request(int cmd_sock, int data_sock){
 	}
 	do{
 		mex = receive_packet(cmd_sock, &cmd_addr_client);
+		if (mex == NULL){
+			perror("error receiving packet");
+			exit(EXIT_FAILURE);
+		}
 	} while( !(mex -> flag & ACK));
 
 	//stop_timer
@@ -60,6 +64,10 @@ void manage_connection_request(int cmd_sock, int data_sock){
 
 	do{
 		mex = receive_packet(data_sock, &data_addr_client);
+		if (mex == NULL){
+			perror("error receiving packet");
+			exit(EXIT_FAILURE);
+		}
 	} while( !(mex -> flag & ACK));
 
 	//stop_timer

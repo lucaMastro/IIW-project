@@ -215,6 +215,10 @@ ssize_t receive_data(int data_sock, int cmd_sock, void *write_here,
 		Message *mex;
 		//leggo
 		mex = receive_packet(data_sock, NULL);
+		if (mex == NULL){
+			perror("error receiving packet in receive_data");
+			exit(EXIT_FAILURE);
+		}
 
 //		stampa_mess(mex);
 //		printf("\n");

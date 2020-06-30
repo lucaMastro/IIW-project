@@ -141,6 +141,10 @@ void *waiting_for_ack(void *q){
 	do{
 
 		ack = receive_packet(queue -> cmd_sock, NULL);
+		if (ack == NULL){
+			perror("error receiving ack");
+			exit(EXIT_FAILURE);
+		}
 		if (! (ack -> flag & ACK) ) {
 			free(ack);
 			continue;

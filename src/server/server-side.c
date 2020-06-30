@@ -179,6 +179,10 @@ void *thread_function(void * params){
 
 		//waiting for command mex:
 		cmd = receive_packet(cmd_sock, NULL);
+		if (cmd == NULL){
+			perror("error in receive cmd");
+			exit(EXIT_FAILURE);
+		}
 		flag = cmd -> flag;
 
 		//stampa_mess(cmd);
@@ -314,6 +318,10 @@ int main(int argc, char **argv) {
 			exit(1);
 		}*/
 		syn = receive_packet(sockfd, client_addr);
+		if (syn == NULL){
+			perror("error in receive syn");
+			exit(EXIT_FAILURE);
+		}
 		flag = syn -> flag;
 		/*	check sul flag	*/
 		if ((flag & SYN) != SYN) continue;

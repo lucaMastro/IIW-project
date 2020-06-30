@@ -157,6 +157,10 @@ int main(int argc, char *argv[ ]) {
 		if (FD_ISSET(cmd_sock, &read_set)){
 			//check se flag del messaggio ricevuto è un FIN
 			cmd = receive_packet(cmd_sock, NULL);
+			if (cmd == NULL){
+				perror("error receiving packet cmd");
+				exit(EXIT_FAILURE);
+			}
 			if (cmd -> flag & FIN){
 				printf("unlock select by cmd socket. exiting\n");
 				exit(EXIT_SUCCESS);
