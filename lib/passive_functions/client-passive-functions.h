@@ -90,28 +90,33 @@ void show_man(int kind){
 			printf("Usage of List Command\n");
 			printf("=====================\n\n");
 
-			printf("ftp> ls\n\n");
+			printf("ftp > ls\n\n");
 			break;
 		case (1):
 			printf("Usage of Get Command\n");
 			printf("====================\n\n");
 
-			printf("ftp> get <file_name_on_server> <file_name_in_local>\n");
+			printf("ftp > get <file_name_on_server> <file_name_in_local>\n");
 			printf("take care: the destination folder is standard: client-file\n\n");
 			break;
 		case (2):
 			printf("Usage of Put Command\n");
 			printf("====================\n\n");
 
-			printf("ftp> put <file_name_in_local> <file_name_on_server>\n");
+			printf("ftp > put <file_name_in_local> <file_name_on_server>\n");
 			printf("take care: the source folder is standard: client-file\n\n");
 			break;		
 		case (3):
 			printf("Usage of Exit Command\n");
 			printf("=====================\n\n");
 
-			printf("ftp> exit\n");
+			printf("ftp > exit\n");
 			break;		
+		case(4):
+			printf("Usage of Clear Command\n");
+			printf("=====================\n\n");
+
+			printf("ftp > clear\n\n");
 
 	}
 }
