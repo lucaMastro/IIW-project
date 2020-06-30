@@ -209,6 +209,7 @@ void *thread_function(void * params){
 			case PUT:
 
 				printf("put case received\n");
+				printf("Request of upload for '%s' \n", cmd -> list_data);
 				server_put_operation(cmd_sock, data_sock, 
 						cmd -> list_data, semaphore);
 				break;

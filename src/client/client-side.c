@@ -164,7 +164,6 @@ int main(int argc, char *argv[ ]) {
 		}
 		else
 			manage_cmd_line(command, data_sock, cmd_sock);
-		printf("ok\n");
 	}
 
 	exit(0);

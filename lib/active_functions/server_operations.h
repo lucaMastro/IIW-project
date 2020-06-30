@@ -108,8 +108,6 @@ void server_get_operation(int cmd_sock, int data_sock, char *file_requested){
 	strcat(complete_path, SERVER_FOLDER);
 	strcat(complete_path, file_requested);
 	
-	printf("Request of download for '%s' \n",file_requested);			
-
 	//verifico se il file esiste effettivamente
 	if(access(complete_path, F_OK) == -1){
 		if (errno == ENOENT){
