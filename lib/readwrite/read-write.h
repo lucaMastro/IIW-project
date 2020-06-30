@@ -81,7 +81,10 @@ void *make_packet(Message *mess_to_fill, void *read_data_from_here, int seq_num,
 
 
 int is_packet_lost(){
-	return ( (rand() % 101 ) < p); 
+	int n =  rand() % 101 ; 
+	printf("random: %d\n", n);
+	return ( n < p); 
+	//return ( (rand() % 101 ) < p); 
 	//n = rand() %101 => n in [0, 100]
 	//n < p with prob p.
 }
@@ -239,6 +242,7 @@ ssize_t receive_data(int data_sock, int cmd_sock, void *write_here,
 
 		if ( !is_packet_lost() )
 			send_packet(cmd_sock, &ack, NULL);
+		printf("ack num: %u\n", ack.ack_num);
 		
 	}
 	while ((flag & END_OF_DATA) != END_OF_DATA);
@@ -246,22 +250,26 @@ ssize_t receive_data(int data_sock, int cmd_sock, void *write_here,
 	//check if last ack is lost:
 	
 	struct timeval to;
-	to.tv_sec = Tsec <<1;
-	to.tv_usec = (Tnsec / 1000)<<1; //nano secs to micro secs
+	to.tv_sec = Tsec <<3;
+	to.tv_usec = (Tnsec / 1000)<<3; //nano secs to micro secs
 	//set a timer equals timeout
-	setsockopt(data_sock, SOL_SOCKET, SO_RCVTIMEO, &to, sizeof(to));
 	while(1){
+		setsockopt(data_sock, SOL_SOCKET, SO_RCVTIMEO, &to, sizeof(to));
 		Message *m = receive_packet(data_sock, NULL);
 		if (m == NULL){ //read(..) -> -1 
+			//printf("\n\nRETURNED NULL\n");
 			if (errno != EAGAIN){
 				perror("error in last receive_pack of receive_data");
 				exit(EXIT_FAILURE);
 			}	
-			else
+			else{
+				printf("ELSE: TUTTO OK\n\n");
 				break;
+			}
 		}
 		if (!is_packet_lost())
 			send_packet(cmd_sock, &ack, NULL);
+		printf("ack num in timerized while: %u\n", ack.ack_num);
 		free(m);
 	}
 	//deleting timeout

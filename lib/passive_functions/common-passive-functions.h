@@ -34,12 +34,18 @@ int connect_retry(int sockfd, struct sockaddr_in *addr, socklen_t alen,
 }
 
 
-char *change_name(char *name_file, char *folder_path){
+char *change_name(char *const_name_file, char *folder_path){
 	//name_file is <name>.<ext>. 
 	//name_file still exists. i will make:
 	//<name>(i).<ext>
 	//where i is the lowest integer possible
 	
+	char *name_file = (char*) malloc(strlen(const_name_file + 1));
+	if (name_file == NULL){
+		perror("error malloc name_file");
+		exit(EXIT_FAILURE);
+	}
+	strcpy(name_file, const_name_file);
 	char *new_file_name, **multiple_dots, *tmp;
 	char str_index[3]; //max i = 99
 	int i = 1, j, tokens_num = 0, ret_access;
@@ -101,6 +107,7 @@ char *change_name(char *name_file, char *folder_path){
 		i++;
 	} while (ret_access == 0); //if 0, still exist
 
+	free(name_file);
 	return new_file_name;
 
 }

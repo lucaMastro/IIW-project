@@ -58,17 +58,21 @@ void manage_cmd_line(char *command, int data_sock, int cmd_sock){
 		}
 
 		else if ( !strcmp(list[0], "get") ){
-			if (list[1] != NULL && list[2] != NULL 
-					&& list[3] == NULL)
+			if (list[1] != NULL && list[3] == NULL){
+				if (list[2] == NULL)
+					list[2] = list[1];
 				client_get_operation(cmd_sock, data_sock, list[1], list[2]);
+			}
 			else
 				show_man(1);
 		}
 
 		else if ( !strcmp(list[0], "put") ){
-			if (list[1] != NULL && list[2] != NULL 
-					&& list[3] == NULL)
+			if (list[1] != NULL && list[3] == NULL){
+				if (list[2] == NULL)
+					list[2] = list[1];
 				client_put_operation(cmd_sock, data_sock, list[1], list[2]);
+			}
 			else
 				show_man(2);
 		}
@@ -160,6 +164,7 @@ int main(int argc, char *argv[ ]) {
 		}
 		else
 			manage_cmd_line(command, data_sock, cmd_sock);
+		printf("ok\n");
 	}
 
 	exit(0);

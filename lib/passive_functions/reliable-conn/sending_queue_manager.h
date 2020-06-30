@@ -43,24 +43,21 @@ void retrasmission(Sending_queue *queue){
 	Message *m;
 	int start_ind = queue -> send_base % RECEIVE_WINDOW;
 			
-	//printf("on fly: %d\n", queue -> num_on_fly_pack );
+	printf("on fly: %d\n", queue -> num_on_fly_pack );
 
 	for (i = start_ind; i < start_ind + on_fly; i++){
 		m = queue -> on_fly_message_queue[i % RECEIVE_WINDOW];
-	//	printf("m pointer %p\n", m);
 		if ( m != NULL && !is_packet_lost() ){
 			send_packet(queue -> data_sock, m, NULL);
-	//		printf("packet %u sent correctly\n\n", m -> seq_num);
-			//queue -> num_on_fly_pack ++;
+			printf("packet %u sent correctly\n\n", m -> seq_num);
 		}	
 		else
-	//		if (m != NULL)
-	//			printf("packet %u not sent\n\n", m -> seq_num);
+			if (m != NULL)
+				printf("packet %u not sent\n\n", m -> seq_num);
 	//		else
 	//			break;
 			if (m == NULL)
 				break;
-//		if (m != NULL )
 	}
 
 	struct itimerspec restart_timer;
