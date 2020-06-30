@@ -53,7 +53,8 @@ ssize_t writen(int fd, ssize_t n, struct sockaddr_in *to,
 void *make_packet(Message *mess_to_fill, void *read_data_from_here, 
 		int seq_num, int ack_num, int flag_to_set);
 ssize_t send_data(int connected_fd, int cmd_sock, void *data, int type);
-ssize_t receive_data(int data_sock, int cmd_sock, void *write_here,
+//ssize_t receive_data(int data_sock, int cmd_sock, void *write_here,
+void receive_data(int data_sock, int cmd_sock, void *write_here,
 		int *save_here_flag);
 void write_data(Message *mex, void *dest, unsigned char *src, int *str_len,
 		int *old_str_len);

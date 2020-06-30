@@ -115,11 +115,12 @@ void client_get_operation(int cmd_sock, int data_sock, char *file_to_get,
 		exit(EXIT_FAILURE);
 	}
 	//ricevi messaggi	
-	int n = receive_data(data_sock, cmd_sock, new_file, NULL);
-	if (n < 0) {
+	//int n = receive_data(data_sock, cmd_sock, new_file, NULL);
+	receive_data(data_sock, cmd_sock, new_file, NULL);
+/*	if (n < 0) {
 		perror("errore in thread_recvfrom");
 		exit(1);	
-	}
+	}*/
 //	}
 
 	fclose(new_file);
@@ -136,27 +137,20 @@ void client_list_operation(int cmd_sock, int data_sock){
 	make_packet(&list_mex, NULL, 0, 0, LIST);
 
 
-	struct timeval timeout;
-	do{
-		send_packet(cmd_sock, &list_mex, NULL);
-		timeout.tv_sec = 1;
-		timeout.tv_usec = 0;
-
-		//attesa di ack 
-		ack = receive_packet(cmd_sock, NULL);
-		if (ack == NULL){
-			perror("error receiving ack");
-			exit(EXIT_FAILURE);
-		}
+	send_packet(cmd_sock, &list_mex, NULL);
+	ack = receive_packet(cmd_sock, NULL);
+	if (ack == NULL){
+		perror("error receiving ack");
+		exit(EXIT_FAILURE);
 	}
-	while (ack == NULL || (ack -> flag & ACK) == 0);
 
 	unsigned char *list = NULL;
 
-	if (receive_data(data_sock, cmd_sock, &list, NULL ) < 0) {
+	receive_data(data_sock, cmd_sock, &list, NULL );
+	/*if (receive_data(data_sock, cmd_sock, &list, NULL ) < 0) {
 		perror("errore in recvfrom");
 		exit(1);
-	}
+	}*/
 
 	//stampo contenuto
 	 //printf("list message content:\n%s.\n", list);

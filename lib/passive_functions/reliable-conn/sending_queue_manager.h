@@ -48,7 +48,7 @@ void retrasmission(Sending_queue *queue){
 	for (i = start_ind; i < start_ind + on_fly; i++){
 		m = queue -> on_fly_message_queue[i % RECEIVE_WINDOW];
 		if (m != NULL){		
-			//printf("packet %u\n\n", m -> seq_num);
+			printf("packet %u\n\n", m -> seq_num);
 			if (!is_packet_lost())
 				send_packet(queue -> data_sock, m, NULL);
 		}

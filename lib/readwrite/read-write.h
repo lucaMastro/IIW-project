@@ -81,10 +81,10 @@ void *make_packet(Message *mess_to_fill, void *read_data_from_here, int seq_num,
 
 
 int is_packet_lost(){
-//	int n =  rand() % 101 ; 
-//	printf("random: %d\n", n);
-//	return ( n < p); 
-	return ( (rand() % 101 ) < p); 
+	int n =  rand() % 101 ; 
+	printf("random: %d\n", n);
+	return ( n < p); 
+	//return ( (rand() % 102 ) < p); 
 	//n = rand() %101 => n in [0, 100]
 	//n < p with prob p.
 }
@@ -178,7 +178,7 @@ ssize_t send_data(int data_sock, int cmd_sock, void *data, int type){
 		}
 		//else
 		//	printf("packet %u not sent\n\n", mex -> seq_num);
-		//printf("packet %u\n\n", mex -> seq_num);
+		printf("packet %u\n\n", mex -> seq_num);
 
 	//	packet_sent ++;
 		
@@ -197,11 +197,12 @@ ssize_t send_data(int data_sock, int cmd_sock, void *data, int type){
 }
 
 
-ssize_t receive_data(int data_sock, int cmd_sock, void *write_here, 
+//ssize_t receive_data(int data_sock, int cmd_sock, void *write_here, 
+void receive_data(int data_sock, int cmd_sock, void *write_here, 
 		int *save_here_flag){
 
 	int max_size = HEADER_SIZE + MSS;
-	ssize_t n_read;
+	//ssize_t n_read = 0;
 	int str_len = 0;
 	int old_str_len;
 	uint16_t flag = 0;
@@ -240,7 +241,6 @@ ssize_t receive_data(int data_sock, int cmd_sock, void *write_here,
 					write_data(mex, write_here, mex -> list_data, &str_len, &old_str_len);	
 		//		}	
 
-			//test retrasmission. simulate lost of a entire window
 				ack.ack_num = expected_seq_num; 
 				expected_seq_num = (expected_seq_num + 1) % MAX_SEQ_NUM;
 				
@@ -249,7 +249,7 @@ ssize_t receive_data(int data_sock, int cmd_sock, void *write_here,
 
 		if ( !is_packet_lost() )
 			send_packet(cmd_sock, &ack, NULL);
-//		printf("ack num: %u\n", ack.ack_num);
+		printf("ack num: %u\n\n", ack.ack_num);
 		
 	}
 	while ((flag & END_OF_DATA) != END_OF_DATA);
@@ -257,8 +257,8 @@ ssize_t receive_data(int data_sock, int cmd_sock, void *write_here,
 	//check if last ack is lost:
 	
 	struct timeval to;
-	to.tv_sec = Tsec <<1;
-	to.tv_usec = (Tnsec / 1000)<<1; //nano secs to micro secs
+	to.tv_sec = Tsec <<2;
+	to.tv_usec = (Tnsec / 1000)<<2; //nano secs to micro secs
 	//set a timer equals timeout
 	while(1){
 		setsockopt(data_sock, SOL_SOCKET, SO_RCVTIMEO, &to, sizeof(to));
@@ -276,7 +276,7 @@ ssize_t receive_data(int data_sock, int cmd_sock, void *write_here,
 		}
 		if (!is_packet_lost())
 			send_packet(cmd_sock, &ack, NULL);
-//		printf("ack num in timerized while: %u\n", ack.ack_num);
+		printf("ack num in timerized while: %u\n\n", ack.ack_num);
 		free(m);
 	}
 	//deleting timeout
@@ -284,7 +284,7 @@ ssize_t receive_data(int data_sock, int cmd_sock, void *write_here,
 	to.tv_usec = 0; 
 	setsockopt(data_sock, SOL_SOCKET, SO_RCVTIMEO, &to, sizeof(to));
 		
-	return n_read;
+//	return n_read;
 
 }
 

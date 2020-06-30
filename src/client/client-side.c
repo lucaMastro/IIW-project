@@ -90,6 +90,9 @@ void manage_cmd_line(char *command, int data_sock, int cmd_sock){
 			else
 				show_man(3);
 		}
+		else{
+			printf("[Error]: Command not valid.\n");
+		}
 	}
 }
 
@@ -158,7 +161,7 @@ int main(int argc, char *argv[ ]) {
 			//check se flag del messaggio ricevuto è un FIN
 			cmd = receive_packet(cmd_sock, NULL);
 			if (cmd == NULL){
-				perror("error receiving packet cmd");
+				perror("here error receiving packet cmd");
 				exit(EXIT_FAILURE);
 			}
 			if (cmd -> flag & FIN){

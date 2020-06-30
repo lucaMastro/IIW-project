@@ -86,11 +86,12 @@ void server_put_operation(int cmd_sock, int data_sock, char *file_name, int sem_
 		exit(EXIT_FAILURE);	
 	}
 
-	n = receive_data(data_sock, cmd_sock, file_received, NULL);
-	if (n < 0) {
+	//n = receive_data(data_sock, cmd_sock, file_received, NULL);
+	receive_data(data_sock, cmd_sock, file_received, NULL);
+	/*if (n < 0) {
 		perror("errore in thread_recvfrom");
 		exit(EXIT_FAILURE);	
-	}	
+	}*/	
 	fclose(file_received);
 }
 
