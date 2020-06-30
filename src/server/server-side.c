@@ -116,7 +116,7 @@ void *thread_function(void * params){
 	struct sockaddr_in cmd_addr_client, data_addr_client;
 	const socklen_t size = sizeof(struct sockaddr_in);
 
-	signal(SIGALRM, timer_handler);  
+	//signal(SIGALRM, timer_handler);  
 
 	my_params = (struct thread_params *) params;
 

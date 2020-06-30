@@ -95,12 +95,12 @@ void *waiting_for_ack(void *q){
 
 	Message *ack;
 
-	signal(SIGALRM, retrasmission_handler);  
+	signal(SIGUSR1, retrasmission_handler);  
 	
 	struct sigevent se;	
 	se.sigev_notify = SIGEV_THREAD_ID;
 	se._sigev_un._tid = syscall(SYS_gettid);
-	se.sigev_signo = SIGALRM;
+	se.sigev_signo = SIGUSR1;
 
 	
 	struct itimerspec start_timer, stop_timer;
