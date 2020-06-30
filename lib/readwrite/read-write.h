@@ -241,10 +241,13 @@ ssize_t receive_data(int data_sock, int cmd_sock, void *write_here,
 			}
 		}
 
-		send_packet(cmd_sock, &ack, NULL);
-		printf("ack sent:");
-		stampa_mess(&ack);
-		printf("\n");
+		if ( !is_packet_lost() ){
+			send_packet(cmd_sock, &ack, NULL);
+			printf("ack sent:");
+			stampa_mess(&ack);
+			printf("\n");
+			
+		}
 	}
 	while ((flag & END_OF_DATA) != END_OF_DATA);
 		

@@ -90,7 +90,7 @@ void *waiting_for_ack(void *q){
 
 	int sem = queue -> semaphore;
 	int flag = 0;
-	int acked_seq_num = -1;
+	int new_send_base = 0;
 	int freeding_pos;
 	int was_last;
 	Message *to_ack;
@@ -154,13 +154,19 @@ void *waiting_for_ack(void *q){
 			}
 			freeding_pos = ack -> ack_num % RECEIVE_WINDOW;
 			to_ack = queue -> on_fly_message_queue[freeding_pos];
-			queue -> num_on_fly_pack --;
+
+			new_send_base = ack -> ack_num + 1;
+			//in general, i can ack more packets with an ack: then the 
+			//flying packets can be decremented of more than 1 for ack.
+			//the differents beetwen the new send-base and the old send-base
+			//is the number of packet i aim to ack
+			queue -> num_on_fly_pack -= new_send_base - queue -> send_base;
 			
 			was_last = (to_ack -> flag & END_OF_DATA);
 			free(to_ack);
 			to_ack = NULL;
 
-			queue -> send_base = ack -> ack_num + 1;
+			queue -> send_base = new_send_base;
 
 			//sblocco invio
 			if (semop(sem, &sops, 1) < 0){
