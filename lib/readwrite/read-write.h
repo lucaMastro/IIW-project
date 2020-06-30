@@ -250,6 +250,32 @@ ssize_t receive_data(int data_sock, int cmd_sock, void *write_here,
 		}
 	}
 	while ((flag & END_OF_DATA) != END_OF_DATA);
+
+	//check if last ack is lost:
+	
+	struct timeval to;
+	to.tv_sec = Tsec <<1;
+	to.tv_usec = (Tnsec / 1000)<<1; //nano secs to micro secs
+	//set a timer equals timeout
+	setsockopt(data_sock, SOL_SOCKET, SO_RCVTIMEO, &to, sizeof(to));
+	while(1){
+		Message *m = receive_packet(data_sock, NULL);
+		if (m == NULL){ //read(..) -> -1 
+			if (errno != EAGAIN){
+				perror("error in last receive_pack of receive_data");
+				exit(EXIT_FAILURE);
+			}	
+			else
+				break;
+		}
+		if (!is_packet_lost())
+			send_packet(cmd_sock, &ack, NULL);
+		free(m);
+	}
+	//deleting timeout
+	to.tv_sec = 0;
+	to.tv_usec = 0; 
+	setsockopt(data_sock, SOL_SOCKET, SO_RCVTIMEO, &to, sizeof(to));
 		
 	return n_read;
 
@@ -328,8 +354,9 @@ Message *receive_packet(int sockfd, struct sockaddr_in *from){
 	}
 
 	if (n_read < 0){
-		perror("error in read");
-		exit(EXIT_FAILURE);		
+		return NULL;
+		/*perror("error in read");
+		exit(EXIT_FAILURE);*/
 	}
 
 	//alloco la struttura in deserialize
