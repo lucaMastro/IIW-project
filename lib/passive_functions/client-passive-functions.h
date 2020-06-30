@@ -20,8 +20,6 @@ void send_syn(int sockfd, char *ip, int *new_ports){
 	//waiting for synack
 	syn_ack = receive_packet(sockfd, NULL);
 
-	printf("new_port = %s\n", syn_ack -> list_data);
-	
 	tmp = strtok((char*) syn_ack -> list_data, " ");
 	cmd_port = atoi(tmp);
 
@@ -74,8 +72,6 @@ void make_connection(int sockfd, char *ip, int *cmd_sock, int *data_sock){
 		exit(EXIT_FAILURE);
 	}
 
-	printf("both socked connected\n");
-	
 }
 
 

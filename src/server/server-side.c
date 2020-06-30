@@ -338,7 +338,6 @@ int main(int argc, char **argv) {
 		unsigned char port_num_string[12];
 		memset(port_num_string, 0, 12);
 		sprintf(port_num_string, "%u %u", new_port_nums[0], new_port_nums[1]);
-		printf("string num: %s\n", port_num_string);
 
 		//sending syn-ack
 		make_packet(&syn_ack, port_num_string, 0, 0,

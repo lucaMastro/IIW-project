@@ -119,7 +119,6 @@ int main(int argc, char *argv[ ]) {
 	close(sockfd);
 
 	
-	printf("cmd_sock = %d\ndata_sock = %d\n", cmd_sock, data_sock);
 	fd_set read_set;
 	FD_ZERO(&read_set);
 	int maxfd;
@@ -134,6 +133,7 @@ int main(int argc, char *argv[ ]) {
 	printf("\t4. Exit, by running\n\texit\n\n");
 	printf("\t5. Clean, to clear the shell, by running\n\tclear\n\n");
 	while (1){
+		printf("\n");
 		//memset((void*) command, 0, MAX_CMD_SIZE);
 		printf("ftp > ");
 		fflush(stdout);
@@ -149,8 +149,7 @@ int main(int argc, char *argv[ ]) {
 			exit(EXIT_FAILURE);
 		}
 
-		printf("select unlocked\n");
-			
+
 		if (FD_ISSET(cmd_sock, &read_set)){
 			//check se flag del messaggio ricevuto è un FIN
 			cmd = receive_packet(cmd_sock, NULL);
@@ -165,52 +164,4 @@ int main(int argc, char *argv[ ]) {
 
 	exit(0);
 }
-
-
-					/*tmp = strtok(command, " ");		
-					
-					if ( strcmp(tmp, "ls") == 0){ //first param ls
-						//i don't need more tokens:
-						if ( (tmp = strtok(NULL, " ")) != NULL ) 
-							client_list_operation(cmd_sock, data_sock);
-						else
-							show_man(0);
-					}
-				
-					else if ( strcmp(tmp, "get") == 0){
-						name_on_server = strtok(NULL, " ");
-						if (name_on_server != NULL){
-							name_on_local = strtok(NULL, " ");
-							if (name_on_local != NULL && 
-									tmp = strtok(NULL, " ")) //no other par
-								client_get_operation(cmd_sock, data_sock);
-							else
-								show_man(1);
-						else
-							show_man(1);	
-					}
-					else if ( strcmp(tmp, "put") == 0){
-						name_on_local = strtok(NULL, " ");
-						if (name_on_local != NULL){
-							name_on_server = strtok(NULL, " ");
-							if (name_on_server != NULL && 
-									tmp = strtok(NULL, " ")) //no other par
-								client_put_operation(cmd_sock, data_sock);
-							else
-								show_man(2);
-						else
-							show_man(2);	
-					}
-					else if ( strcmp(command, "exit") == 0){
-						if ( (tmp = strtok(NULL, " ")) != NULL ) {
-							client_exit_operation(cmd_sock, data_sock);
-							exit(EXIT_SUCCESS);
-						}
-						else
-							show_man(3);
-					}
-				}*/
-	
-
-
 

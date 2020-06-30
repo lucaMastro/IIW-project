@@ -81,10 +81,7 @@ void *make_packet(Message *mess_to_fill, void *read_data_from_here, int seq_num,
 
 
 int is_packet_lost(){
-	int n = rand() % 101;
-	printf("rand = %d\n", n);
-	return (n < p);
-	//return ( (rand() % 101 ) < p); 
+	return ( (rand() % 101 ) < p); 
 	//n = rand() %101 => n in [0, 100]
 	//n < p with prob p.
 }
@@ -139,7 +136,6 @@ ssize_t send_data(int data_sock, int cmd_sock, void *data, int type){
 				
 			}
 		}
-		printf("coin got\n");
 		queue -> num_on_fly_pack ++;
 		
 		//cerco la sock su cui inviare:
@@ -174,11 +170,11 @@ ssize_t send_data(int data_sock, int cmd_sock, void *data, int type){
 		queue -> next_seq_num = (queue -> next_seq_num + 1) % MAX_SEQ_NUM;
 
 		if ( !is_packet_lost() ){
-			printf("packet %u sent correctly\n\n", mex -> seq_num);
+		//	printf("packet %u sent correctly\n\n", mex -> seq_num);
 			send_packet(sending_sock, mex, NULL);
 		}
-		else
-			printf("packet %u not sent\n\n", mex -> seq_num);
+		//else
+		//	printf("packet %u not sent\n\n", mex -> seq_num);
 
 		packet_sent ++;
 		
@@ -241,13 +237,9 @@ ssize_t receive_data(int data_sock, int cmd_sock, void *write_here,
 			}
 		}
 
-		if ( !is_packet_lost() ){
+		if ( !is_packet_lost() )
 			send_packet(cmd_sock, &ack, NULL);
-			printf("ack sent:");
-			stampa_mess(&ack);
-			printf("\n");
-			
-		}
+		
 	}
 	while ((flag & END_OF_DATA) != END_OF_DATA);
 

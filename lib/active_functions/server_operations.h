@@ -34,7 +34,6 @@ int check_for_existing_file(int semaphore, char *path,
 	memset((void*) complete_path, 0, len + 1);
 	strcat(complete_path, SERVER_FOLDER);
 	strcat(complete_path, path);
-	printf("%s\n", complete_path);
 	
 
 	if (semop(semaphore, &sops, 1) == -1){
@@ -42,7 +41,6 @@ int check_for_existing_file(int semaphore, char *path,
 		return -1;
 	}
 
-	printf("coin got\n");
 	//got the coin. check for existing
 	if ((ret_access = access(complete_path, F_OK)) == -1 &&
 		errno != ENOENT){
@@ -54,7 +52,6 @@ int check_for_existing_file(int semaphore, char *path,
 		printf("file still exist\n");
 		//rinonimo file e continuo
 		free(complete_path);
-		//printf("new file name: %s\n", change_name(path, SERVER_FOLDER));
 		complete_path = change_name(path, SERVER_FOLDER);
 	}
 
@@ -67,13 +64,10 @@ int check_for_existing_file(int semaphore, char *path,
 	/*	file create. unlock the semaphore	*/
 	sops.sem_op = 1;
 
-/*	if (thread_num == 0)
-		sleep(10);*/
 	if (semop(semaphore, &sops, 1) == -1){
 		perror("error in releasing coin");
 		return -1;
 	}	
-	printf ("coin released\n");
 	free(complete_path);
 
 	return 0;
@@ -174,7 +168,6 @@ char *make_file_list(){
 
 	}
 
-	printf ("returning: %s.\n", file_list);
 	return file_list;
 
 }
@@ -183,7 +176,6 @@ char *make_file_list(){
 void server_list_operation(int cmd_sock, int data_sock){
 	char *file_list = make_file_list();
 	
-	printf("file list = %s\n", file_list);
 	send_data(data_sock, cmd_sock, file_list, CHAR_INDICATOR);
 	free(file_list);
 }

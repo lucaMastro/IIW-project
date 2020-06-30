@@ -52,8 +52,6 @@ void manage_connection_request(int cmd_sock, int data_sock){
 	connect_retry(cmd_sock, &cmd_addr_client, 
 			sizeof(cmd_addr_client), NULL);
 
-	printf("connected on cmd_sock\n");
-
 	//start timer
 	if (timer_settime(conn_timer, 0, &start_timer, NULL) < 0){
 		perror("error starting conn_timer");
@@ -73,7 +71,6 @@ void manage_connection_request(int cmd_sock, int data_sock){
 	connect_retry(data_sock, &data_addr_client, 
 			sizeof(data_addr_client), NULL);
 
-	printf("connected on data_sock\n");
 
 	//deleting timer
 	timer_delete(conn_timer);

@@ -26,7 +26,6 @@ void client_put_operation(int cmd_sock, int data_sock, char *file_to_send,
 	memset((void*) complete_path, 0, len);
 	sprintf(complete_path, "%s%s", CLIENT_FOLDER, file_to_send);
 
-	printf("looking for %s\n", complete_path);
 
 	//verifico se il file esiste effettivamente
 	if(access(complete_path, F_OK) == -1){
@@ -84,8 +83,10 @@ void client_get_operation(int cmd_sock, int data_sock, char *file_to_get,
 	
 	else if (ret_access == 0){ //the file still exist
 		printf("file still exist\n");
+		free(complete_path);
+		complete_path = change_name(local_name, CLIENT_FOLDER);
 		//possibilità di aggiunger (1) anche qui.
-		return;
+		//return;
 	}
 
 	//crea file
@@ -116,19 +117,12 @@ void client_get_operation(int cmd_sock, int data_sock, char *file_to_get,
 	fclose(new_file);
 	//free(file_to_get);
 	free(complete_path);
+	//leggere exit code, se fallisce elimina file
 }
 
 
 
 void client_list_operation(int cmd_sock, int data_sock){
-
-	//faccio partire timer 
-	//setsockopt(new_cmd_sock,SOL_SOCKET,SO_RCVTIMEO,(char*)&timeout,sizeof(struct timeval));
-
-	/*if (send_data(data_sock, cmd_sock, NULL, LIST) < 0){
-		perror("errore in sendto");
-		exit(1);
-	}*/
 
 	Message list_mex, *ack = NULL;
 	make_packet(&list_mex, NULL, 0, 0, LIST);
@@ -137,7 +131,6 @@ void client_list_operation(int cmd_sock, int data_sock){
 	struct timeval timeout;
 	do{
 		send_packet(cmd_sock, &list_mex, NULL);
-		printf("sent request\n");
 		timeout.tv_sec = 1;
 		timeout.tv_usec = 0;
 
@@ -148,14 +141,14 @@ void client_list_operation(int cmd_sock, int data_sock){
 
 	unsigned char *list = NULL;
 
-	printf("waiting for data:\n");
 	if (receive_data(data_sock, cmd_sock, &list, NULL ) < 0) {
 		perror("errore in recvfrom");
 		exit(1);
 	}
 
 	//stampo contenuto
-	 printf("list message content:\n%s.\n", list);
+	 //printf("list message content:\n%s.\n", list);
+	 printf("%s\n", list);
 	 free(list);
 }
 
