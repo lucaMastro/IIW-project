@@ -20,7 +20,7 @@ void initialize_struct(Sending_queue *queue){
 
 	queue -> send_base = 1;
 	queue -> next_seq_num = 1;
-	queue -> all_acked = 1;
+	queue -> num_on_fly_pack = 0;
 
 	queue -> on_fly_message_queue = (Message **)
 		malloc(sizeof(Message*) * RECEIVE_WINDOW);
@@ -39,17 +39,28 @@ void initialize_struct(Sending_queue *queue){
 
 void retrasmission(Sending_queue *queue){
 	//ciclo da send base e ritrasmetto i mess:
-	int i;
+	int i, on_fly = queue -> num_on_fly_pack;
 	Message *m;
 	int start_ind = queue -> send_base % RECEIVE_WINDOW;
+			
+	printf("on fly: %d\n", queue -> num_on_fly_pack );
 
-	for (i = start_ind; i < start_ind + RECEIVE_WINDOW; i++){
-		m = queue -> on_fly_message_queue[i];
-		if ( m != NULL)
+	for (i = start_ind; i < start_ind + on_fly; i++){
+		m = queue -> on_fly_message_queue[i % RECEIVE_WINDOW];
+		printf("m pointer %p\n", m);
+		if ( m != NULL && !is_packet_lost() ){
 			send_packet(queue -> data_sock, m, NULL);
-		
+			printf("packet %u sent correctly\n\n", m -> seq_num);
+			//queue -> num_on_fly_pack ++;
+		}	
 		else
-			break;
+			if (m != NULL)
+				printf("packet %u not sent\n\n", m -> seq_num);
+			else
+				break;
+		//	if (m == NULL)
+		//		break;
+//		if (m != NULL )
 	}
 
 	struct itimerspec restart_timer;
@@ -143,6 +154,7 @@ void *waiting_for_ack(void *q){
 			}
 			freeding_pos = ack -> ack_num % RECEIVE_WINDOW;
 			to_ack = queue -> on_fly_message_queue[freeding_pos];
+			queue -> num_on_fly_pack --;
 			
 			was_last = (to_ack -> flag & END_OF_DATA);
 			free(to_ack);
@@ -155,6 +167,7 @@ void *waiting_for_ack(void *q){
 				perror("error unlocking semaphore");
 				exit(EXIT_FAILURE);
 			}
+//			printf("coin released\n");
 			if (timer_settime(timer_id, 0, &start_timer, NULL) < 0){
 				perror("error in starting timer");
 				exit(EXIT_FAILURE);

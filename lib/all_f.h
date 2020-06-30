@@ -45,6 +45,7 @@ void manage_connection_request(int cmd_sock, int data_sock);
 //reliable_conn
 void initialize_struct(Sending_queue *queue);
 void *waiting_for_ack(void *q);
+int is_packet_lost(); //it is temporanly in read-write.h
 
 //red-write
 ssize_t writen(int fd, ssize_t n, struct sockaddr_in *to,

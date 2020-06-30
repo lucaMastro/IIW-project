@@ -20,11 +20,11 @@
 	
 #define HEADER_SIZE 	6	
 #define MSS				500
-#define RECEIVE_WINDOW	8		
 #define MAX_SEQ_NUM 	255
+#define RECEIVE_WINDOW	8		
 #define Tsec			0
 #define Tnsec			5000000 //5 ms
-//#define p 			
+#define p 				40 //40% lost	
 
 
 

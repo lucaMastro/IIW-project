@@ -7,5 +7,5 @@ typedef struct sending_queue{
 	uint8_t next_seq_num;
 	int cmd_sock;
 	int data_sock;
-	int all_acked;
+	int num_on_fly_pack;
 }Sending_queue;

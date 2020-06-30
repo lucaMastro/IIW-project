@@ -80,6 +80,15 @@ void *make_packet(Message *mess_to_fill, void *read_data_from_here, int seq_num,
 }
 
 
+int is_packet_lost(){
+	int n = rand() % 101;
+	printf("rand = %d\n", n);
+	return (n < p);
+	//return ( (rand() % 101 ) < p); 
+	//n = rand() %101 => n in [0, 100]
+	//n < p with prob p.
+}
+
 
 ssize_t send_data(int data_sock, int cmd_sock, void *data, int type){
 	ssize_t bytes_sent = 0;
@@ -103,6 +112,7 @@ ssize_t send_data(int data_sock, int cmd_sock, void *data, int type){
 	sops.sem_num = 0;
 	sops.sem_op = -1;
 
+	srand(time(0));
 
 	int sem = semget(IPC_PRIVATE, 1, IPC_CREAT|0666);
 	if (sem < 0){
@@ -129,6 +139,8 @@ ssize_t send_data(int data_sock, int cmd_sock, void *data, int type){
 				
 			}
 		}
+		printf("coin got\n");
+		queue -> num_on_fly_pack ++;
 		
 		//cerco la sock su cui inviare:
 		Message *mex = (Message *)
@@ -161,7 +173,13 @@ ssize_t send_data(int data_sock, int cmd_sock, void *data, int type){
 		//incremento seq_num
 		queue -> next_seq_num = (queue -> next_seq_num + 1) % MAX_SEQ_NUM;
 
-		send_packet(sending_sock, mex, NULL);
+		if ( !is_packet_lost() ){
+			printf("packet %u sent correctly\n\n", mex -> seq_num);
+			send_packet(sending_sock, mex, NULL);
+		}
+		else
+			printf("packet %u not sent\n\n", mex -> seq_num);
+
 		packet_sent ++;
 		
 		//save flag for exiting
@@ -197,7 +215,6 @@ ssize_t receive_data(int data_sock, int cmd_sock, void *write_here,
 		Message *mex;
 		//leggo
 		mex = receive_packet(data_sock, NULL);
-		flag = mex -> flag;
 
 		//salvo flag per il controllo a serverside
 		if (save_here_flag != NULL )
@@ -206,15 +223,16 @@ ssize_t receive_data(int data_sock, int cmd_sock, void *write_here,
 		//devo scrivere solo se è il seq_num atteso:
 		//è possibile che arrivino pacchetti con solo header
 		if (mex -> seq_num == expected_seq_num){
+			flag = mex -> flag;
 			
-			if ( (mex -> seq_num == 2 || mex -> seq_num == 12) && test_timer == 0)
+		/*	if ( (mex -> seq_num == 2 || mex -> seq_num == 12) && test_timer == 0)
 			//if (mex -> seq_num == 2 && test_timer == 0)
 				test_timer++;
-			else{
+			else{*/
 				if (mex -> length > 0){
 					//write_data(mex, write_here, tmp, &str_len, &old_str_len);	
 					write_data(mex, write_here, mex -> list_data, &str_len, &old_str_len);	
-				}	
+		//		}	
 
 			//test retrasmission. simulate lost of a entire window
 				ack.ack_num = expected_seq_num; 
@@ -224,6 +242,9 @@ ssize_t receive_data(int data_sock, int cmd_sock, void *write_here,
 		}
 
 		send_packet(cmd_sock, &ack, NULL);
+		printf("ack sent:");
+		stampa_mess(&ack);
+		printf("\n");
 	}
 	while ((flag & END_OF_DATA) != END_OF_DATA);
 		
