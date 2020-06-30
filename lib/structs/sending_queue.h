@@ -1,3 +1,7 @@
+#define RECEIVE_WINDOW	8		
+#define Tsec			0
+#define Tnsec			200000000 //200 ms
+#define p 				40 //40% lost	
 
 typedef struct sending_queue{
 	Message **on_fly_message_queue;

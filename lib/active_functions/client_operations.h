@@ -78,31 +78,8 @@ void client_get_operation(int cmd_sock, int data_sock, char *file_to_get,
 	memset((void*) complete_path, 0, len + 1);
 	sprintf(complete_path, "%s%s", CLIENT_FOLDER, local_name);
 
-	//controllo se non è già presente nel client
-	if ((ret_access = access(complete_path, F_OK)) == -1 &&
-		errno != ENOENT){
-			perror("error in access");
-			exit(EXIT_FAILURE);
-	}	
-	
-	else if (ret_access == 0){ //the file still exist
-		printf("file still exist\n");
-		free(complete_path);
-		complete_path = change_name(local_name, CLIENT_FOLDER);
-		//possibilità di aggiunger (1) anche qui.
-		//return;
-	}
-
-	//crea file
-	FILE *new_file; 
-	new_file = fopen(complete_path, "w+");
-	if(new_file == NULL){
-		printf("error in creation of '%s'\n", complete_path);		
-		exit(1);		
-	}	
 
 	//invio comando con nome
-
 	Message get;
 	make_packet(&get, file_to_get, 0, 0,GET |CHAR_INDICATOR);
 	send_packet(cmd_sock, &get, NULL);
@@ -114,6 +91,33 @@ void client_get_operation(int cmd_sock, int data_sock, char *file_to_get,
 		perror("error receiving ack");
 		exit(EXIT_FAILURE);
 	}
+
+	if ( (ack -> flag & FILE_NOT_FOUND) ){
+		printf("[Error]: file doesnt exist server-side\n");
+		return;
+	}
+
+	//controllo se non è già presente nel client
+	if ((ret_access = access(complete_path, F_OK)) == -1 &&
+		errno != ENOENT){
+			perror("error in access");
+			exit(EXIT_FAILURE);
+	}	
+	
+	else if (ret_access == 0){ //the file still exist
+		printf("file still exist\n");
+		free(complete_path);
+		complete_path = change_name(local_name, CLIENT_FOLDER);
+		printf("it will be saved as %s\n", complete_path);
+	}
+
+	//crea file
+	FILE *new_file; 
+	new_file = fopen(complete_path, "w+");
+	if(new_file == NULL){
+		printf("error in creation of '%s'\n", complete_path);		
+		exit(1);		
+	}	
 	//ricevi messaggi	
 	receive_data(data_sock, cmd_sock, new_file, NULL);
 

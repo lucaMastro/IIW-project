@@ -97,6 +97,7 @@ void server_get_operation(int cmd_sock, int data_sock, char *file_requested){
 	
 	char *complete_path;
 	int len = strlen(SERVER_FOLDER) + strlen(file_requested) + 1;
+	Message mex;
 
 	complete_path = (char *) malloc(sizeof(char) * len);
 	if (complete_path == NULL){
@@ -107,18 +108,24 @@ void server_get_operation(int cmd_sock, int data_sock, char *file_requested){
 	//strcat(complete_path, SERVER_FOLDER);
 	//strcat(complete_path, file_requested);
 	sprintf(complete_path, "%s%s", SERVER_FOLDER, file_requested);
-	printf("ok\n");
 	
 	//verifico se il file esiste effettivamente
 	if(access(complete_path, F_OK) == -1){
 		if (errno == ENOENT){
 			//send error message
+			make_packet(&mex, NULL, 0, 0, ACK | FILE_NOT_FOUND);
+			send_packet(cmd_sock, &mex, NULL);
+			return;
 		}
 		else{
 			perror("error in access");
 			exit(EXIT_FAILURE);
 		}
 
+	}
+	else{
+		make_packet(&mex, NULL, 0, 0, ACK);
+		send_packet(cmd_sock, &mex, NULL);
 	}
 
 	//apro file

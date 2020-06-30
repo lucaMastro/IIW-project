@@ -187,8 +187,6 @@ void *thread_function(void * params){
 
 		//stampa_mess(cmd);
 		//sending ack
-		ack.ack_num = cmd -> seq_num;
-		send_packet(cmd_sock, &ack, NULL);
 		
 		switch(flag & (LIST | PUT | GET | FIN)){
 
@@ -196,6 +194,8 @@ void *thread_function(void * params){
 			case LIST:
 
 				printf("list case received\n");
+				ack.ack_num = cmd -> seq_num;
+				send_packet(cmd_sock, &ack, NULL);
 				server_list_operation(cmd_sock, data_sock);
 
 				break;
@@ -205,6 +205,7 @@ void *thread_function(void * params){
 
 				printf("get case received\n");
 				printf("Request of download for '%s' \n", cmd -> list_data);
+				//send ack only if file exists
 				server_get_operation(cmd_sock, data_sock, cmd -> list_data);
 				
 				break;
@@ -213,6 +214,9 @@ void *thread_function(void * params){
 			case PUT:
 
 				printf("put case received\n");
+				ack.ack_num = cmd -> seq_num;
+				send_packet(cmd_sock, &ack, NULL);
+		
 				printf("Request of upload for '%s' \n", cmd -> list_data);
 				server_put_operation(cmd_sock, data_sock, 
 						cmd -> list_data, semaphore);
@@ -221,6 +225,8 @@ void *thread_function(void * params){
 			case FIN:
 
 				printf("Exit case received\n");
+				ack.ack_num = cmd -> seq_num;
+				send_packet(cmd_sock, &ack, NULL);
 				close(cmd_sock);
 				close(data_sock);
 				free(name_file);

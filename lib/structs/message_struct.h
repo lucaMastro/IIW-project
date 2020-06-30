@@ -21,13 +21,6 @@
 #define HEADER_SIZE 	6	
 #define MSS				500
 #define MAX_SEQ_NUM 	255
-#define RECEIVE_WINDOW	8		
-#define Tsec			0
-#define Tnsec			200000000 //200 ms
-#define p 				40 //40% lost	
-
-
-
 
 #define SYN 				1
 #define SYN_ACK 			2
@@ -38,6 +31,7 @@
 #define PUT 				64
 #define CHAR_INDICATOR 		128
 #define END_OF_DATA			256
+#define FILE_NOT_FOUND		512
 
 
 typedef struct message{
