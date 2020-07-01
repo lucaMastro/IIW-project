@@ -33,7 +33,7 @@
 
 
 
-void manage_cmd_line(char *command, int data_sock, int cmd_sock){
+int manage_cmd_line(char *command, int data_sock, int cmd_sock){
 	
 	char *list[4];
 	if (fgets(command, MAX_CMD_SIZE, stdin) == NULL){
@@ -42,6 +42,9 @@ void manage_cmd_line(char *command, int data_sock, int cmd_sock){
 	}				
 	else{
 		command[strlen(command) - 1] = '\0'; //eliminating \n
+		if ( !(strcmp(command, "")) )
+			return 1;
+		
 		for (int i = 0; i < 4; i++)
 			list[i] = NULL;
 
@@ -94,13 +97,13 @@ void manage_cmd_line(char *command, int data_sock, int cmd_sock){
 			printf("[Error]: Command not valid.\n");
 		}
 	}
+	return 1;
 }
 
 int main(int argc, char *argv[ ]) {
 	
 	
 	int sockfd, cmd_sock, data_sock;
-	struct sockaddr_in servaddr, cmd_server_addr, data_server_addr;
 	char command[MAX_CMD_SIZE];
 
 	if (argc != 2) { /* controlla numero degli argomenti */
@@ -130,7 +133,7 @@ int main(int argc, char *argv[ ]) {
 	FD_ZERO(&read_set);
 	int maxfd;
 	Message *cmd;
-	
+	int valid_cmd = 1;	
 	printf("\e[1;1H\e[2J");
 	printf("Welcome to udt-reliable go-back-n ftp protocol.\n");
 	printf("You can use these operation:\n");
@@ -140,10 +143,13 @@ int main(int argc, char *argv[ ]) {
 	printf("\t4. Exit, by running\n\texit\n\n");
 	printf("\t5. Clean, to clear the shell, by running\n\tclear\n\n");
 	while (1){
-		printf("\n");
+		if (valid_cmd){
+			printf("\n");
 		//memset((void*) command, 0, MAX_CMD_SIZE);
-		printf("ftp > ");
-		fflush(stdout);
+			printf("ftp > ");
+			fflush(stdout);
+		}
+		valid_cmd = 0;
 		FD_SET(cmd_sock, &read_set);
 		FD_SET(fileno(stdin), &read_set);
 
@@ -170,7 +176,7 @@ int main(int argc, char *argv[ ]) {
 			}
 		}
 		else
-			manage_cmd_line(command, data_sock, cmd_sock);
+			valid_cmd = manage_cmd_line(command, data_sock, cmd_sock);
 	}
 
 	exit(0);

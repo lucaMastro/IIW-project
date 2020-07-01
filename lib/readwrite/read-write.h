@@ -12,6 +12,7 @@
 
 void write_data(Message *mex, void *dest, unsigned char *src, int *str_len, int *old_str_len);
 void send_ack(int cmd_sock, int ack_num);
+void check_last_ack(int cmd_sock, int data_sock, Message *ack);
 
 
 
@@ -89,12 +90,14 @@ int is_packet_lost(){
 }
 
 
-ssize_t send_data(int data_sock, int cmd_sock, void *data, int type){
+ssize_t send_data(int data_sock, int cmd_sock, void *data, int type,
+		char *read_from_ack){
 	ssize_t bytes_sent = 0;
 	int len_ser = HEADER_SIZE;
 	unsigned char *new_data_pointer = (unsigned char*) data;
 	int flag = 0;
 	int sending_sock;
+	int is_command = 0;
 
 //	int packet_sent = 0;
 	pthread_t tid;
@@ -153,6 +156,14 @@ ssize_t send_data(int data_sock, int cmd_sock, void *data, int type){
 		mex -> flag = type;
 		memset((void*) mex -> list_data, 0, MSS);
 
+		if ( (is_command = is_command_mex(mex)) ){
+			sending_sock = cmd_sock;
+			queue -> send_base = 0;
+			queue -> should_read_data = 1;
+			queue -> next_seq_num = 0;
+		}
+		else
+			sending_sock = data_sock;
 
 		if ( (type & CHAR_INDICATOR) == CHAR_INDICATOR)
 			new_data_pointer = (unsigned char *) 
@@ -166,9 +177,10 @@ ssize_t send_data(int data_sock, int cmd_sock, void *data, int type){
 				0, 
 				type);
 
-		sending_sock = (is_command_mex(mex) ) ? cmd_sock : data_sock;
+		//sending_sock = (is_command_mex(mex) ) ? cmd_sock : data_sock;
 
 		//store the message in the queue:
+		//stampa_mess(mex);
 		queue -> on_fly_message_queue[mex -> seq_num % RECEIVE_WINDOW]	= mex;
 		//incremento seq_num
 		queue -> next_seq_num = (queue -> next_seq_num + 1) % MAX_SEQ_NUM;
@@ -188,6 +200,10 @@ ssize_t send_data(int data_sock, int cmd_sock, void *data, int type){
 		perror("error in join");
 		exit(EXIT_FAILURE);
 	}
+
+	if (is_command)
+		sprintf(read_from_ack, "%s", queue -> buf);
+
 	free(queue);
 	return bytes_sent;
 }
@@ -243,8 +259,9 @@ void receive_data(int data_sock, int cmd_sock, void *write_here,
 
 
 	//check if last ack is lost:
+	check_last_ack(cmd_sock, data_sock, &ack);
 	
-	struct timeval to;
+/*	struct timeval to;
 	to.tv_sec = Tsec <<2;
 	to.tv_usec = (Tnsec / 1000)<<2; //nano secs to micro secs
 	while(1){
@@ -270,8 +287,42 @@ void receive_data(int data_sock, int cmd_sock, void *write_here,
 	to.tv_sec = 0;
 	to.tv_usec = 0; 
 	setsockopt(data_sock, SOL_SOCKET, SO_RCVTIMEO, &to, sizeof(to));
-		
+*/		
 //	return n_read;
+
+}
+
+void check_last_ack(int cmd_sock, int data_sock, Message *ack){
+	struct timeval to;
+	to.tv_sec = Tsec <<2;
+	to.tv_usec = (Tnsec / 1000)<<2; //nano secs to micro secs
+	//to.tv_sec = Tsec;
+	//to.tv_usec = Tnsec / 1000; //nano secs to micro secs
+	Message *m;
+	while(1){
+		setsockopt(data_sock, SOL_SOCKET, SO_RCVTIMEO, &to, sizeof(to));
+		m = receive_packet(data_sock, NULL);
+		if (m == NULL){ //read(..) -> -1 
+			//printf("\n\nRETURNED NULL\n");
+			if (errno != EAGAIN){
+				perror("error in last receive_pack of receive_data");
+				exit(EXIT_FAILURE);
+			}	
+			else
+				break;
+			
+		}
+		if (ack != NULL && !is_packet_lost()){
+			send_packet(cmd_sock, ack, NULL);
+		}
+		//printf("ack num in timerized while: %u\n\n", ack.ack_num);
+		free(m);
+	}
+	free(m);
+	//deleting timeout
+	to.tv_sec = 0;
+	to.tv_usec = 0; 
+	setsockopt(data_sock, SOL_SOCKET, SO_RCVTIMEO, &to, sizeof(to));
 
 }
 
@@ -358,4 +409,73 @@ Message *receive_packet(int sockfd, struct sockaddr_in *from){
 
 	free(serialized);
 	return mex;
+}
+
+
+
+int send_read_cmd(int cmd_sock, int data_sock, int cmd, 
+		char *data){
+
+	struct timeval to;
+	Message cmd_mex;
+	Message *rec;
+	int flag = 0;
+
+	make_packet(&cmd_mex, data, 0, 0, cmd);
+
+	//in ascolto su entrambe le socket
+	
+	fd_set read_set;
+	FD_ZERO(&read_set);
+	int maxfd;
+
+	to.tv_sec = Tsec;
+	to.tv_usec = Tnsec / 1000;
+//	to.tv_sec = 5;
+//	to.tv_usec = 0;
+	int select_ret;
+	
+	maxfd = data_sock < cmd_sock ? (cmd_sock + 1) : (data_sock + 1);
+	while (1){
+		send_packet(cmd_sock, &cmd_mex, NULL);
+		
+		FD_SET(cmd_sock, &read_set);
+		FD_SET(data_sock, &read_set);
+
+		//l'ultimo parametro è struct timeval, per un timer
+		//if (select(maxfd, &read_set, NULL, NULL, &to) < 0){
+		select_ret = select(maxfd, &read_set, NULL, NULL, &to);
+
+		if (select_ret <0){
+			perror("error in select");
+			exit(EXIT_FAILURE);
+		}
+
+		if (FD_ISSET(cmd_sock, &read_set)){
+			//check se flag del messaggio ricevuto è un FIN
+			rec = receive_packet(cmd_sock, NULL);
+			if (rec == NULL){
+				perror("error receiving packet cmd");
+				exit(EXIT_FAILURE);
+			}
+			if ( (flag = rec -> flag) & FIN) {
+				printf("connection close serverside\n");
+				exit(EXIT_SUCCESS);
+			}
+			else if (flag & FILE_NOT_FOUND){
+				printf("[Error]: file doesnt exist server-side\n");
+				return -1;
+			}
+			else if (flag & ACK){
+				if (rec -> length > 0 && flag & CHAR_INDICATOR)
+					printf("The file will be saved as %s on server.\n", 
+							rec -> list_data);
+				break; //esco dal while
+			}
+		}
+		else if (FD_ISSET(data_sock, &read_set) )
+			break; //ho perso ack del comando, mi invia dati
+	}
+
+	return 0;
 }

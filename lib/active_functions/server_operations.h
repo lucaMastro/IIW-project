@@ -12,11 +12,12 @@
 #define SERVER_FOLDER "src/server/server-files/"
 
 int check_for_existing_file(int semaphore, char *path, 
-		FILE **to_create, char *new_file_name){
+		FILE **to_create, char **new_name){
 	
 	char *complete_path;
 	int len = strlen(SERVER_FOLDER);
 	int ret_access;
+	int flag = ACK;
 	struct sembuf sops;
 	sops.sem_flg = 0;
 	sops.sem_num = 0;
@@ -52,8 +53,19 @@ int check_for_existing_file(int semaphore, char *path,
 		printf("file still exist\n");
 		//rinonimo file e continuo
 		free(complete_path);
-		complete_path = change_name(path, SERVER_FOLDER);
+		int new_name_len = strlen(path) + 1;
+		*new_name = (char*) malloc(sizeof(char) * new_name_len);
+		if (*new_name == NULL){
+			perror("error in new_name malloc");
+			exit(EXIT_FAILURE);
+		}
+		memset((void*) *new_name, 0, new_name_len);
+		complete_path = change_name(path, SERVER_FOLDER, new_name);
 	}
+	else//file doeesn exit
+		*new_name = NULL;
+
+	
 
 	*to_create = fopen(complete_path, "w+");
 	if (*to_create == NULL){
@@ -77,14 +89,50 @@ void server_put_operation(int cmd_sock, int data_sock, char *file_name, int sem_
 
 	int n;
 	FILE *file_received;
-	char *new_file_name = NULL;
+	char *new_file_name;
 	//controllo se già non esiste, in caso rinominalo es pippo1.txt
 	if (check_for_existing_file(sem_id,
 				file_name,
 				&file_received,
-				new_file_name) < 0){
+				&new_file_name) < 0){
 		exit(EXIT_FAILURE);	
 	}
+
+
+	Message ack, *m;
+	int flag = ACK;
+	if (new_file_name != NULL)
+		flag = flag | CHAR_INDICATOR;
+
+	make_packet(&ack, new_file_name, 0, 0, flag);
+	
+	if (new_file_name != NULL)
+		free(new_file_name);
+
+	struct timeval to;
+	to.tv_sec = (Tsec) << 2;
+	to.tv_usec = (Tnsec / 1000) << 2;
+	while(1) {
+		if (!is_packet_lost())
+			send_packet(cmd_sock, &ack, NULL);
+		
+		setsockopt(cmd_sock, SOL_SOCKET, SO_RCVTIMEO, &to, sizeof(to));
+		m = receive_packet(cmd_sock, NULL);
+		if (m == NULL){
+			if (errno != EAGAIN){
+				perror("error in new receive packet lsot");
+				exit(EXIT_FAILURE);
+			}
+			else{
+				break; //timeout, client has read err mex
+			}
+		}
+		else
+			free(m);
+	}
+	to.tv_sec = 0;
+	to.tv_usec = 0;
+	setsockopt(cmd_sock, SOL_SOCKET, SO_RCVTIMEO, &to, sizeof(to));
 
 	receive_data(data_sock, cmd_sock, file_received, NULL);
 	if (fclose(file_received) == EOF){
@@ -112,7 +160,33 @@ void server_get_operation(int cmd_sock, int data_sock, char *file_requested){
 		if (errno == ENOENT){
 			//send error message
 			make_packet(&mex, NULL, 0, 0, ACK | FILE_NOT_FOUND);
-			send_packet(cmd_sock, &mex, NULL);
+			Message *m;
+			struct timeval to;
+			to.tv_sec = (Tsec) << 2;
+			to.tv_usec = (Tnsec / 1000) << 2;
+
+			while(1) {
+				if (!is_packet_lost())
+					send_packet(cmd_sock, &mex, NULL);
+				
+				setsockopt(cmd_sock, SOL_SOCKET, SO_RCVTIMEO, &to, sizeof(to));
+				m = receive_packet(cmd_sock, NULL);
+				if (m == NULL){
+					if (errno != EAGAIN){
+						perror("error in new receive packet lsot");
+						exit(EXIT_FAILURE);
+					}
+					else{
+						break; //timeout, client has read err mex
+					}
+	
+				}
+				else
+					free(m);
+			}
+			to.tv_sec = 0;
+			to.tv_usec = 0;
+			setsockopt(cmd_sock, SOL_SOCKET, SO_RCVTIMEO, &to, sizeof(to));
 			return;
 		}
 		else{
@@ -123,14 +197,16 @@ void server_get_operation(int cmd_sock, int data_sock, char *file_requested){
 	}
 	else{
 		make_packet(&mex, NULL, 0, 0, ACK);
-		send_packet(cmd_sock, &mex, NULL);
+		//doesnt matter if ack lost: i will send data
+		if (!is_packet_lost())
+			send_packet(cmd_sock, &mex, NULL);
 	}
 
 	//apro file
 	FILE *file_to_send;
 	file_to_send = fopen(complete_path, "rb"); 
 
-	if (send_data(data_sock, cmd_sock, file_to_send, 0) < 0){
+	if (send_data(data_sock, cmd_sock, file_to_send, 0, NULL) < 0){
 		perror("errore in sendto");
 		exit(EXIT_FAILURE);
 	}
@@ -187,6 +263,6 @@ char *make_file_list(){
 void server_list_operation(int cmd_sock, int data_sock){
 	char *file_list = make_file_list();
 	
-	send_data(data_sock, cmd_sock, file_list, CHAR_INDICATOR);
+	send_data(data_sock, cmd_sock, file_list, CHAR_INDICATOR, NULL);
 	free(file_list);
 }

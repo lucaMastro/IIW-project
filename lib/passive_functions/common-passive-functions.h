@@ -34,7 +34,7 @@ int connect_retry(int sockfd, struct sockaddr_in *addr, socklen_t alen,
 }
 
 
-char *change_name(char *const_name_file, char *folder_path){
+char *change_name(char *const_name_file, char *folder_path, char **new_name){
 	//name_file is <name>.<ext>. 
 	//name_file still exists. i will make:
 	//<name>(i).<ext>
@@ -108,6 +108,21 @@ char *change_name(char *const_name_file, char *folder_path){
 	} while (ret_access == 0); //if 0, still exist
 
 	free(name_file);
+
+	if (new_name != NULL){
+		//storing the name file
+		char *tmp = new_file_name + strlen(folder_path); //name(1).ext
+		/*int name_len = strlen(tmp) + 1;
+		new_name = (char*) malloc(sizeof(char) * name_len);
+		if (new_name == NULL){
+			perror("error in new_name malloc");
+			exit(EXIT_FAILURE);
+		}
+		memset((void*)new_name, 0, name_len);*/
+		sprintf(*new_name, "%s", tmp);
+	}
+
+
 	return new_file_name;
 
 }

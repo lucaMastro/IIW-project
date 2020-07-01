@@ -39,7 +39,6 @@ typedef struct thread_params{
   int port_numbers[2];
   int semaphore;
   int *array_port;
-  //indirizzo ip mittente;
 } Thread_params;
 
 
@@ -84,14 +83,9 @@ void generate_port(int *array_port, int *new_port_nums){
 }
 
 
-__thread int cmd_sock, data_sock;
+__thread int cmd_sock;
+__thread int data_sock;
 
-/*void timer_handler (int signum){
-
-  printf ("Timed out!\n");
-  //uccidi thread 
-  //rimuovi la sua porta dall array
-}*/
 
 
 void delete_ports(int cmd_port, int data_port, int *array_ports){
@@ -181,8 +175,12 @@ void *thread_function(void * params){
 			case LIST:
 
 				printf("list case received\n");
+				//doesnt matter if ack lost: i will receive data on
+				//data_sock, until client will send an ack of that data.
+				//a select clientside check if socket are ready
 				ack.ack_num = cmd -> seq_num;
-				send_packet(cmd_sock, &ack, NULL);
+				if (!is_packet_lost())
+					send_packet(cmd_sock, &ack, NULL);
 				server_list_operation(cmd_sock, data_sock);
 
 				break;
@@ -201,10 +199,9 @@ void *thread_function(void * params){
 			case PUT:
 
 				printf("put case received\n");
-				ack.ack_num = cmd -> seq_num;
-				send_packet(cmd_sock, &ack, NULL);
-		
-				printf("Request of upload for '%s' \n", cmd -> list_data);
+				//in put case, client must receive the ack to know
+				//when server is ready to receive
+				printf("Request of upload for '%s'\n", cmd -> list_data);
 				server_put_operation(cmd_sock, data_sock, 
 						cmd -> list_data, semaphore);
 				break;
@@ -212,8 +209,11 @@ void *thread_function(void * params){
 			case FIN:
 
 				printf("Exit case received\n");
+				//doesnt matter if not receive ack: client will close
 				ack.ack_num = cmd -> seq_num;
-				send_packet(cmd_sock, &ack, NULL);
+				if (!is_packet_lost())
+					send_packet(cmd_sock, &ack, NULL);
+
 				close(cmd_sock);
 				close(data_sock);
 				free(cmd);

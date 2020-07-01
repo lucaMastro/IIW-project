@@ -27,6 +27,8 @@ void initialize_struct(Sending_queue *queue){
 	queue -> send_base = 1;
 	queue -> next_seq_num = 1;
 	queue -> num_on_fly_pack = 0;
+	queue -> should_read_data = 0;
+	queue -> buf = NULL;
 
 	queue -> on_fly_message_queue = (Message **)
 		malloc(sizeof(Message*) * RECEIVE_WINDOW);
@@ -145,10 +147,6 @@ void *waiting_for_ack(void *q){
 
 	sampleDEV.it_value.tv_sec = 0;
 	sampleDEV.it_value.tv_nsec = 0;
-/*	unsigned long estimatedRTT;
-	unsigned long sampleRTT;
-	unsigned long estimatedDEV;
-	unsigned long sampleDEV;*/
 	
 #endif
 
@@ -184,9 +182,6 @@ void *waiting_for_ack(void *q){
 		perror("error in starting timer");
 		exit(EXIT_FAILURE);
 	}
-//	printf("timer started\n");
-//	printf("mex 1:");
-//	stampa_mess(queue->on_fly_message_queue[1]);
 
 //	printf("thread rx on sock %d\n", queue -> cmd_sock);
 	do{
@@ -196,7 +191,8 @@ void *waiting_for_ack(void *q){
 			perror("error receiving ack");
 			exit(EXIT_FAILURE);
 		}
-		if (! (ack -> flag & ACK) ) {
+		
+		if (! (ack -> flag & ACK | ack -> flag & SYN_ACK) ) {
 			if (ack -> flag & FIN){
 				printf("[Error]: connection closed server-side\n");
 				free(ack);
@@ -295,6 +291,20 @@ void *waiting_for_ack(void *q){
 
 			queue -> send_base = new_send_base;
 
+			//check if have to read data from ack: only in cmd mex
+			if (queue -> should_read_data){
+				queue -> buf = (char*) 
+					malloc(sizeof(char) * (ack -> length + 1));
+
+				if (queue -> buf == NULL){
+					perror("error inizializing buf queue");
+					exit(EXIT_FAILURE);
+				}
+				memset((void*)queue -> buf, 0, ack -> length + 1);
+
+				memcpy(queue -> buf, ack -> list_data, ack -> length);
+			}
+
 			//sblocco invio
 			if (semop(sem, &sops, 1) < 0){
 				perror("error unlocking semaphore");
@@ -308,7 +318,7 @@ void *waiting_for_ack(void *q){
 
 		free(ack);
 	}while(was_last == 0); //ho ricevuto ack dell'ultimo
-	//printf("exited from ack thread\n");
+//	printf("exited from ack thread\n");
 
 	timer_delete(timer_id);
 	pthread_exit(NULL);

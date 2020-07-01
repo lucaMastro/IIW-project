@@ -3,7 +3,7 @@
 void send_syn(int sockfd, char *ip, int *new_ports){
 	struct sockaddr_in server_listen_addr;
 	Message syn, *syn_ack;
-	char *tmp;
+	char *tmp, data[MSS];
 	int cmd_port, data_port;
 
 	memset((void*) &server_listen_addr, 0, sizeof(server_listen_addr));
@@ -14,6 +14,12 @@ void send_syn(int sockfd, char *ip, int *new_ports){
 		exit(EXIT_FAILURE);
 	}
 
+	connect(sockfd, (struct sockaddr*)&server_listen_addr,
+			sizeof(server_listen_addr) );
+
+	memset((void*)data, 0, MSS);
+	send_data(sockfd, sockfd, NULL, SYN, data);
+	/*
 	make_packet(&syn, NULL, 0, 0, SYN);
 	send_packet(sockfd, &syn, &server_listen_addr);
 
@@ -22,9 +28,10 @@ void send_syn(int sockfd, char *ip, int *new_ports){
 	if (syn_ack == NULL){
 		perror("error receiving syn_ack");
 		exit(EXIT_FAILURE);
-	}
+	}*/
 
-	tmp = strtok((char*) syn_ack -> list_data, " ");
+	//tmp = strtok((char*) syn_ack -> list_data, " ");
+	tmp = strtok(data, " ");
 	cmd_port = atoi(tmp);
 
 	tmp = strtok(NULL, " ");
@@ -33,7 +40,6 @@ void send_syn(int sockfd, char *ip, int *new_ports){
 	new_ports[0] = cmd_port;
 	new_ports[1] = data_port;
 
-	free(syn_ack);
 }
 
 

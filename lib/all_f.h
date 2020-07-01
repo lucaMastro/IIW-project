@@ -23,7 +23,7 @@ void client_list_operation(int cmd_sock, int data_sock);
 
 //active server
 int check_for_existing_file(int semaphore, char *path,
-		FILE **to_create, char *new_file_name);
+		FILE **to_create, char **new_file_name);
 void server_put_operation(int cmd_sock, int data_sock, char *file_name, 
 		int sem_id);
 void server_get_operation(int cmd_sock, int data_sock, char *file_requested);
@@ -52,8 +52,8 @@ ssize_t writen(int fd, ssize_t n, struct sockaddr_in *to,
 		unsigned char *buff);
 void *make_packet(Message *mess_to_fill, void *read_data_from_here, 
 		int seq_num, int ack_num, int flag_to_set);
-ssize_t send_data(int connected_fd, int cmd_sock, void *data, int type);
-//ssize_t receive_data(int data_sock, int cmd_sock, void *write_here,
+ssize_t send_data(int connected_fd, int cmd_sock, void *data, int type, 
+		char *read_from_ack);
 void receive_data(int data_sock, int cmd_sock, void *write_here,
 		int *save_here_flag);
 void write_data(Message *mex, void *dest, unsigned char *src, int *str_len,
