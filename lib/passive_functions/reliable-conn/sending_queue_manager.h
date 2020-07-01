@@ -82,12 +82,12 @@ void retrasmission(Sending_queue *queue){
 			start_timer.it_value.tv_nsec < Tmin)
 		start_timer.it_value.tv_nsec = Tmin;
 
-			printf("rx start timer:\n");
+/*			printf("rx start timer:\n");
 			printf("%lu\n%lu\n%lu\n%lu\n\n", 
 					start_timer.it_value.tv_sec,
 					start_timer.it_value.tv_nsec,
 					start_timer.it_interval.tv_sec,
-					start_timer.it_interval.tv_nsec	);
+					start_timer.it_interval.tv_nsec	);*/
 #else
 	struct itimerspec start_timer;
 	start_timer.it_value.tv_sec = Tsec;
@@ -271,13 +271,12 @@ void *waiting_for_ack(void *q){
 			start_timer.it_interval.tv_sec =start_timer.it_value.tv_sec;
 			start_timer.it_interval.tv_nsec =start_timer.it_value.tv_nsec;
 
-			printf("normal start timer:\n");
+		/*	printf("normal start timer:\n");
 			printf("%lu\n%lu\n%lu\n%lu\n\n", 
 					start_timer.it_value.tv_sec,
 					start_timer.it_value.tv_nsec,
 					start_timer.it_interval.tv_sec,
-					start_timer.it_interval.tv_nsec	);
-
+					start_timer.it_interval.tv_nsec	);*/
 
 #endif
 			freeding_pos = ack -> ack_num % RECEIVE_WINDOW;
