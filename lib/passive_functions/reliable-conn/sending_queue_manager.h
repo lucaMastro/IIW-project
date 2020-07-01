@@ -6,12 +6,18 @@
 #include <sys/ipc.h>
 #include <sys/sem.h>
 #include <sys/types.h> 
+
 //#include "../../structs/message_struct.h"
 //#include "../../structs/sending_queue.h"
 
 
 __thread Sending_queue *queue;
 __thread timer_t timer_id;
+
+#ifdef ADAPT_TO
+#include <math.h>
+__thread struct itimerspec start_timer;
+#endif
 
 
 
@@ -58,13 +64,38 @@ void retrasmission(Sending_queue *queue){
 			break;
 	}
 
-	struct itimerspec restart_timer;
-	restart_timer.it_value.tv_sec = Tsec;
-	restart_timer.it_value.tv_nsec = Tnsec;
-	restart_timer.it_interval.tv_sec = 0;
-	restart_timer.it_interval.tv_nsec = 0;
 
-	if (timer_settime(timer_id, 0, &restart_timer, NULL) < 0){
+#ifdef ADAPT_TO
+	//rx, raddoppio timer, inutile ai fini di test: non c'è ritardo, ma 
+	//solo perdita
+/*	start_timer.it_value.tv_nsec = start_timer.it_value.tv_nsec << 1;
+	if (start_timer.it_value.tv_nsec > 999999999){
+		start_timer.it_value.tv_sec += 1; 
+		start_timer.it_value.tv_nsec -= 1000000000; 
+	}
+	start_timer.it_value.tv_sec = start_timer.it_value.tv_sec << 1; 
+
+	start_timer.it_interval.tv_sec = start_timer.it_interval.tv_sec;
+	start_timer.it_interval.tv_nsec = start_timer.it_interval.tv_nsec;
+	*/
+	if (start_timer.it_value.tv_sec == 0 &&
+			start_timer.it_value.tv_nsec < Tmin)
+		start_timer.it_value.tv_nsec = Tmin;
+
+			printf("rx start timer:\n");
+			printf("%lu\n%lu\n%lu\n%lu\n\n", 
+					start_timer.it_value.tv_sec,
+					start_timer.it_value.tv_nsec,
+					start_timer.it_interval.tv_sec,
+					start_timer.it_interval.tv_nsec	);
+#else
+	struct itimerspec start_timer;
+	start_timer.it_value.tv_sec = Tsec;
+	start_timer.it_value.tv_nsec = Tnsec;
+	start_timer.it_interval.tv_sec = 0;
+	start_timer.it_interval.tv_nsec = 0;
+#endif
+	if (timer_settime(timer_id, 0, &start_timer, NULL) < 0){
 		perror("error in starting timer in rx");
 		exit(EXIT_FAILURE);
 	}
@@ -97,6 +128,32 @@ void *waiting_for_ack(void *q){
 
 	Message *ack;
 
+#ifdef ADAPT_TO
+
+	struct itimerspec estimatedRTT;
+	struct itimerspec sampleRTT;
+	struct itimerspec oldRTT;
+	struct itimerspec devRTT;
+	struct itimerspec estimatedDEV;
+	struct itimerspec sampleDEV;
+
+	sampleDEV.it_value.tv_sec = 0;
+	sampleDEV.it_value.tv_nsec = 0;
+
+	devRTT.it_value.tv_sec = 0;
+	devRTT.it_value.tv_nsec = 0;
+
+	sampleDEV.it_value.tv_sec = 0;
+	sampleDEV.it_value.tv_nsec = 0;
+/*	unsigned long estimatedRTT;
+	unsigned long sampleRTT;
+	unsigned long estimatedDEV;
+	unsigned long sampleDEV;*/
+	
+#endif
+
+
+
 	signal(SIGUSR1, retrasmission_handler);  
 	
 	struct sigevent se;	
@@ -104,19 +161,19 @@ void *waiting_for_ack(void *q){
 	se._sigev_un._tid = syscall(SYS_gettid);
 	se.sigev_signo = SIGUSR1;
 
-	
-	struct itimerspec start_timer, stop_timer;
-
+#ifndef ADAPT_TO
+	struct itimerspec start_timer;
+#endif
 	start_timer.it_value.tv_sec = Tsec;
 	start_timer.it_value.tv_nsec = Tnsec;
 	start_timer.it_interval.tv_sec = Tsec;
 	start_timer.it_interval.tv_nsec = Tnsec;
 
+	struct itimerspec stop_timer;
 	stop_timer.it_value.tv_sec = 0;
 	stop_timer.it_value.tv_nsec = 0;
 	stop_timer.it_interval.tv_sec = 0;
 	stop_timer.it_interval.tv_nsec = 0;
-
 
 	if (timer_create(CLOCK_REALTIME, &se, &timer_id) < 0){
 		perror("error in timer_create");
@@ -155,10 +212,74 @@ void *waiting_for_ack(void *q){
 		if ( ack -> ack_num < queue -> send_base)continue; //ack_duplicato
 		else{ //nuovo ack
 			//disattivo timer:
+
+#ifndef ADAPT_TO
 			if (timer_settime(timer_id, 0, &stop_timer, NULL) < 0){
 				perror("error in stopping timer");
 				exit(EXIT_FAILURE);
 			}
+#else
+			//sampl rtt will contain the remaining time. 
+			//i have to calculate the sample rtt with the difference from
+			//the old rtt
+			if (timer_gettime(timer_id, &sampleRTT) < 0){
+				perror("error in stopping timer");
+				exit(EXIT_FAILURE);
+			}
+			if (timer_settime(timer_id, 0, &stop_timer, &oldRTT) < 0){
+				perror("error in stopping timer");
+				exit(EXIT_FAILURE);
+			}
+
+			sampleRTT.it_value.tv_sec = oldRTT.it_value.tv_sec - 
+				sampleRTT.it_value.tv_sec;
+			sampleRTT.it_value.tv_nsec = oldRTT.it_value.tv_nsec - 
+				sampleRTT.it_value.tv_nsec;
+
+			estimatedRTT.it_value.tv_sec = (1 - a) * oldRTT.it_value.tv_sec;
+			estimatedRTT.it_value.tv_nsec = (1 - a)*oldRTT.it_value.tv_nsec;
+			estimatedRTT.it_value.tv_sec += a * sampleRTT.it_value.tv_sec;
+			estimatedRTT.it_value.tv_nsec += a * sampleRTT.it_value.tv_nsec;
+
+			sampleDEV.it_value.tv_sec = abs(
+					sampleRTT.it_value.tv_sec - devRTT.it_value.tv_sec
+					);
+			sampleDEV.it_value.tv_nsec = abs(
+					sampleRTT.it_value.tv_nsec - devRTT.it_value.tv_nsec
+					);
+			sampleDEV.it_value.tv_sec = b * sampleDEV.it_value.tv_sec;
+			sampleDEV.it_value.tv_nsec = b * sampleDEV.it_value.tv_nsec;
+
+			devRTT.it_value.tv_sec = (1 - b) * devRTT.it_value.tv_sec;
+			devRTT.it_value.tv_nsec = (1 - b) * devRTT.it_value.tv_nsec;
+			
+			devRTT.it_value.tv_sec += b * sampleDEV.it_value.tv_sec;
+			devRTT.it_value.tv_nsec += b * sampleDEV.it_value.tv_nsec;
+
+
+			start_timer.it_value.tv_sec = estimatedRTT.it_value.tv_sec;
+			start_timer.it_value.tv_sec += devRTT.it_value.tv_sec << 2; //*4
+			
+			start_timer.it_value.tv_nsec = estimatedRTT.it_value.tv_nsec;
+			start_timer.it_value.tv_nsec += devRTT.it_value.tv_nsec << 2; 
+			while (start_timer.it_value.tv_nsec > 999999999){
+				start_timer.it_value.tv_sec += 1; 
+				start_timer.it_value.tv_nsec -= 1000000000; 
+			}
+			
+			
+			start_timer.it_interval.tv_sec =start_timer.it_value.tv_sec;
+			start_timer.it_interval.tv_nsec =start_timer.it_value.tv_nsec;
+
+			printf("normal start timer:\n");
+			printf("%lu\n%lu\n%lu\n%lu\n\n", 
+					start_timer.it_value.tv_sec,
+					start_timer.it_value.tv_nsec,
+					start_timer.it_interval.tv_sec,
+					start_timer.it_interval.tv_nsec	);
+
+
+#endif
 			freeding_pos = ack -> ack_num % RECEIVE_WINDOW;
 			to_ack = queue -> on_fly_message_queue[freeding_pos];
 
