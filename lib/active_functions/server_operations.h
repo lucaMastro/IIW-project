@@ -105,8 +105,6 @@ void server_get_operation(int cmd_sock, int data_sock, char *file_requested){
 		exit(EXIT_FAILURE);
 	}
 	memset((void*) complete_path, 0, len);
-	//strcat(complete_path, SERVER_FOLDER);
-	//strcat(complete_path, file_requested);
 	sprintf(complete_path, "%s%s", SERVER_FOLDER, file_requested);
 	
 	//verifico se il file esiste effettivamente

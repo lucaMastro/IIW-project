@@ -39,6 +39,7 @@ void initialize_struct(Sending_queue *queue){
 
 void retrasmission(Sending_queue *queue){
 	//ciclo da send base e ritrasmetto i mess:
+	//printf("timed_out\n");
 	int i, on_fly = queue -> num_on_fly_pack;
 	Message *m;
 	int start_ind = queue -> send_base % RECEIVE_WINDOW;
@@ -48,10 +49,10 @@ void retrasmission(Sending_queue *queue){
 	for (i = start_ind; i < start_ind + on_fly; i++){
 		m = queue -> on_fly_message_queue[i % RECEIVE_WINDOW];
 		if (m != NULL){		
-			printf("packet %u\n\n", m -> seq_num);
+			//printf("packet %u\n\n", m -> seq_num);
 			if (!is_packet_lost())
 				send_packet(queue -> data_sock, m, NULL);
-			printf("rx seq_num = %u\n", m -> seq_num);
+			//printf("rx seq_num = %u\n", m -> seq_num);
 		}
 		else
 			break;
@@ -74,7 +75,7 @@ void retrasmission(Sending_queue *queue){
 
 
 void retrasmission_handler(int signo){
-	printf("timed out\n");
+	//printf("timed out\n");
 	retrasmission(queue);
 }
 
@@ -82,10 +83,11 @@ void retrasmission_handler(int signo){
 void *waiting_for_ack(void *q){
 	queue = (Sending_queue*) q;
 
+	//printf("starting thread\n");
 	int sem = queue -> semaphore;
 	int new_send_base = 0;
 	int freeding_pos;
-	int was_last;
+	int was_last = 0;
 	Message *to_ack;
 
 	struct sembuf sops;
@@ -107,8 +109,8 @@ void *waiting_for_ack(void *q){
 
 	start_timer.it_value.tv_sec = Tsec;
 	start_timer.it_value.tv_nsec = Tnsec;
-	start_timer.it_interval.tv_sec = 0;
-	start_timer.it_interval.tv_nsec = 0;
+	start_timer.it_interval.tv_sec = Tsec;
+	start_timer.it_interval.tv_nsec = Tnsec;
 
 	stop_timer.it_value.tv_sec = 0;
 	stop_timer.it_value.tv_nsec = 0;
@@ -125,9 +127,11 @@ void *waiting_for_ack(void *q){
 		perror("error in starting timer");
 		exit(EXIT_FAILURE);
 	}
-	printf("timer started\n");
+//	printf("timer started\n");
+//	printf("mex 1:");
+//	stampa_mess(queue->on_fly_message_queue[1]);
 
-	printf("thread rx on sock %d\n", queue -> cmd_sock);
+//	printf("thread rx on sock %d\n", queue -> cmd_sock);
 	do{
 
 		ack = receive_packet(queue -> cmd_sock, NULL);
@@ -136,6 +140,11 @@ void *waiting_for_ack(void *q){
 			exit(EXIT_FAILURE);
 		}
 		if (! (ack -> flag & ACK) ) {
+			if (ack -> flag & FIN){
+				printf("[Error]: connection closed server-side\n");
+				free(ack);
+				exit(EXIT_FAILURE);
+			}
 			free(ack);
 			continue;
 		}
@@ -179,8 +188,8 @@ void *waiting_for_ack(void *q){
 
 		free(ack);
 	}while(was_last == 0); //ho ricevuto ack dell'ultimo
+	//printf("exited from ack thread\n");
 
 	timer_delete(timer_id);
-	free(queue);
 	pthread_exit(NULL);
 }

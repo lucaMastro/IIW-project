@@ -105,15 +105,11 @@ void delete_ports(int cmd_port, int data_port, int *array_ports){
 
 void *thread_function(void * params){
 	int semaphore;
-	struct itimerval timer;
 	struct thread_params *my_params;
-	int n;
 	int flag;
-	char *name_file;
 	int cmd_port, data_port;
 
 	struct sockaddr_in cmd_addr_thread, data_addr_thread;
-	struct sockaddr_in cmd_addr_client, data_addr_client;
 	const socklen_t size = sizeof(struct sockaddr_in);
 
 	//signal(SIGALRM, timer_handler);  
@@ -121,7 +117,6 @@ void *thread_function(void * params){
 	my_params = (struct thread_params *) params;
 
 	semaphore = my_params -> semaphore;
-	//struct sockaddr_in *cmd_addr_thread = malloc (sizeof(addr_thread));
 
 	cmd_port = my_params -> port_numbers[0]; 
 	data_port = my_params -> port_numbers[1]; 
@@ -157,7 +152,6 @@ void *thread_function(void * params){
 
 	/* assegna l'indirizzo al socket */
 	if (bind(data_sock, (struct sockaddr *)&data_addr_thread,
-				//sizeof(cmd_addr_thread)) < 0) {
 				size) < 0) {
 		perror("errore in thread_bind");
 		exit(EXIT_FAILURE);
@@ -173,10 +167,6 @@ void *thread_function(void * params){
 
 		printf("\nServer waitings for command\n");
 
-		name_file = NULL;
-
-		//n = receive_data(data_sock, cmd_sock, &name_file, &flag);
-
 		//waiting for command mex:
 		cmd = receive_packet(cmd_sock, NULL);
 		if (cmd == NULL){
@@ -185,9 +175,6 @@ void *thread_function(void * params){
 		}
 		flag = cmd -> flag;
 
-		//stampa_mess(cmd);
-		//sending ack
-		
 		switch(flag & (LIST | PUT | GET | FIN)){
 
 			//list case
@@ -229,7 +216,6 @@ void *thread_function(void * params){
 				send_packet(cmd_sock, &ack, NULL);
 				close(cmd_sock);
 				close(data_sock);
-				free(name_file);
 				free(cmd);
 				delete_ports(cmd_port, data_port, my_params -> array_port);
 				free(my_params);
@@ -237,8 +223,6 @@ void *thread_function(void * params){
 		}
 
 		//it's allocate in each PUT-GET-LIST request
-	//	memset((void*)name_file, 1, strlen(name_file));
-		free(name_file);
 		free(cmd);
 
 	}

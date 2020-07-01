@@ -119,6 +119,7 @@ void client_get_operation(int cmd_sock, int data_sock, char *file_to_get,
 		exit(1);		
 	}	
 	//ricevi messaggi	
+	printf("ok\n");
 	receive_data(data_sock, cmd_sock, new_file, NULL);
 
 	fclose(new_file);

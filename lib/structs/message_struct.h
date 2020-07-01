@@ -37,7 +37,6 @@
 typedef struct message{
 	uint8_t seq_num;
 	uint8_t ack_num;
-	//uint8_t seq_ack_num; //[<4 bit seq> <4 bit ack>]
 	uint16_t flag;
 	uint16_t length;
 	unsigned char list_data[MSS];

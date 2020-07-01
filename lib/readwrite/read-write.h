@@ -82,7 +82,7 @@ void *make_packet(Message *mess_to_fill, void *read_data_from_here, int seq_num,
 
 int is_packet_lost(){
 	int n =  rand() % 101 ; 
-	printf("random: %d\n", n);
+	//printf("random: %d\n", n);
 	return ( n < p); 
 	//n = rand() %101 => n in [0, 100]
 	//n < p with prob p.
@@ -92,7 +92,7 @@ int is_packet_lost(){
 ssize_t send_data(int data_sock, int cmd_sock, void *data, int type){
 	ssize_t bytes_sent = 0;
 	int len_ser = HEADER_SIZE;
-	unsigned char *tmp, *new_data_pointer = (unsigned char*) data;
+	unsigned char *new_data_pointer = (unsigned char*) data;
 	int flag = 0;
 	int sending_sock;
 
@@ -129,6 +129,8 @@ ssize_t send_data(int data_sock, int cmd_sock, void *data, int type){
 	queue -> data_sock = data_sock;
 
 	pthread_create(&tid, NULL, waiting_for_ack, (void*) queue);
+	//printf("pthread created\n");
+	fflush(stdout);
 
 	do{
 		while (semop(queue -> semaphore, &sops, 1)< 0) {
@@ -174,7 +176,7 @@ ssize_t send_data(int data_sock, int cmd_sock, void *data, int type){
 		if ( !is_packet_lost() )
 			send_packet(sending_sock, mex, NULL);
 		
-		printf("packet %u\n\n", mex -> seq_num);
+		//printf("packet %u\n\n", mex -> seq_num);
 
 		//save flag for exiting
 		flag = mex -> flag;
@@ -234,10 +236,11 @@ void receive_data(int data_sock, int cmd_sock, void *write_here,
 
 		if ( !is_packet_lost() )
 			send_packet(cmd_sock, &ack, NULL);
-		printf("ack num: %u\n\n", ack.ack_num);
+		//printf("ack num: %u\n\n", ack.ack_num);
 		
 	}
 	while ((flag & END_OF_DATA) != END_OF_DATA);
+
 
 	//check if last ack is lost:
 	
@@ -260,7 +263,7 @@ void receive_data(int data_sock, int cmd_sock, void *write_here,
 		}
 		if (!is_packet_lost())
 			send_packet(cmd_sock, &ack, NULL);
-		printf("ack num in timerized while: %u\n\n", ack.ack_num);
+		//printf("ack num in timerized while: %u\n\n", ack.ack_num);
 		free(m);
 	}
 	//deleting timeout
