@@ -32,11 +32,20 @@
 #define MAX_CMD_SIZE 200
 
 
+int cmd_sock, data_sock;
+
+
+void sigint_handler(){
+	client_exit_operation(cmd_sock, data_sock);
+	exit(EXIT_SUCCESS);
+}
+
 
 int manage_cmd_line(char *command, int data_sock, int cmd_sock){
 	
 	char *list[4];
 	if (fgets(command, MAX_CMD_SIZE, stdin) == NULL){
+		printf("here");
 		client_exit_operation(cmd_sock, data_sock);
 		exit(EXIT_SUCCESS); //ctrl+c. need handler
 	}				
@@ -103,7 +112,7 @@ int manage_cmd_line(char *command, int data_sock, int cmd_sock){
 int main(int argc, char *argv[ ]) {
 	
 	
-	int sockfd, cmd_sock, data_sock;
+	int sockfd;
 	char command[MAX_CMD_SIZE];
 
 	if (argc != 2) { /* controlla numero degli argomenti */
@@ -128,6 +137,7 @@ int main(int argc, char *argv[ ]) {
 	make_connection(sockfd, argv[1], &cmd_sock, &data_sock);
 	close(sockfd);
 
+	signal(SIGINT, sigint_handler);
 	
 	fd_set read_set;
 	FD_ZERO(&read_set);
@@ -156,8 +166,8 @@ int main(int argc, char *argv[ ]) {
 		maxfd = fileno(stdin) < cmd_sock ? 
 			(cmd_sock + 1) : (fileno(stdin) + 1);
 
-		//l'ultimo parametro è struct timeval, per un timer
-		if (select(maxfd, &read_set, NULL, NULL, NULL) < 0){
+		if (select(maxfd, &read_set, NULL, NULL, NULL) < 0
+				&& errno != EINTR){
 			perror("error in select");
 			exit(EXIT_FAILURE);
 		}

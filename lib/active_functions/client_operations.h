@@ -125,13 +125,28 @@ void client_list_operation(int cmd_sock, int data_sock){
 void client_exit_operation(int cmd_sock, int data_sock){
 	Message fin, *ack;
 	make_packet(&fin, NULL, 0, 0, FIN);
-	send_packet(cmd_sock, &fin, NULL);
 
 	//reading ack:
-	ack = receive_packet(cmd_sock, NULL);	
-	if (ack == NULL){
-		perror("error receiving ack");
-		exit(EXIT_FAILURE);
+	//waiting for a little
+	struct timeval to;
+	to.tv_sec = Tsec;
+	to.tv_usec = Tnsec / 1000;
+
+	for (int i = 0; i < 10; i++){ //after 10 times, it will close
+		if (!is_packet_lost())
+			send_packet(cmd_sock, &fin, NULL);
+		setsockopt(cmd_sock, SOL_SOCKET, SO_RCVTIMEO, &to, sizeof(to));
+		ack = receive_packet(cmd_sock, NULL);	
+		if (ack == NULL){
+			if (errno == EAGAIN)
+				continue;
+			else if (errno == ECONNREFUSED)
+				break; //lost ack
+			else{
+				perror("error receiving ack");
+				exit(EXIT_FAILURE);
+			}
+		}
 	}
 	close(cmd_sock);
 	close(data_sock);

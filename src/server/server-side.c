@@ -210,6 +210,7 @@ void *thread_function(void * params){
 
 				printf("Exit case received\n");
 				//doesnt matter if not receive ack: client will close
+				//if will detect connection refused
 				ack.ack_num = cmd -> seq_num;
 				if (!is_packet_lost())
 					send_packet(cmd_sock, &ack, NULL);
