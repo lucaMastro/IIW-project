@@ -133,7 +133,7 @@ ssize_t send_data(int data_sock, int cmd_sock, void *data, int type,
 
 	pthread_create(&tid, NULL, waiting_for_ack, (void*) queue);
 	//printf("pthread created\n");
-	fflush(stdout);
+	//fflush(stdout);
 
 	do{
 		while (semop(queue -> semaphore, &sops, 1)< 0) {
@@ -188,7 +188,8 @@ ssize_t send_data(int data_sock, int cmd_sock, void *data, int type,
 		if ( !is_packet_lost() )
 			send_packet(sending_sock, mex, NULL);
 		
-		//printf("packet %u\n\n", mex -> seq_num);
+	//	stampa_mess(mex);
+	//	printf("packet %u\n\n", mex -> seq_num);
 
 		//save flag for exiting
 		flag = mex -> flag;
@@ -218,8 +219,6 @@ void receive_data(int data_sock, int cmd_sock, void *write_here,
 	uint16_t flag = 0;
 	uint8_t expected_seq_num = 1;
 	
-	int test_timer = 0;
-
 	Message ack;
 	make_packet(&ack, NULL, 0, 0, ACK);
 	do {
@@ -231,8 +230,8 @@ void receive_data(int data_sock, int cmd_sock, void *write_here,
 			exit(EXIT_FAILURE);
 		}
 
-//		stampa_mess(mex);
-//		printf("\n");
+	//	stampa_mess(mex);
+	//	printf("\n");
 		//salvo flag per il controllo a serverside
 		if (save_here_flag != NULL )
 			*save_here_flag = flag;
@@ -241,13 +240,12 @@ void receive_data(int data_sock, int cmd_sock, void *write_here,
 		//è possibile che arrivino pacchetti con solo header
 		if (mex -> seq_num == expected_seq_num){
 			flag = mex -> flag;
-			if (mex -> length > 0){
+			if (mex -> length > 0)
 				write_data(mex, write_here, mex -> data, 
 						&str_len, &old_str_len);	
-
-				ack.ack_num = expected_seq_num; 
-				expected_seq_num = (expected_seq_num + 1) % MAX_SEQ_NUM;
-			}
+			
+			ack.ack_num = expected_seq_num; 
+			expected_seq_num = (expected_seq_num + 1) % MAX_SEQ_NUM;
 		}
 
 		if ( !is_packet_lost() )

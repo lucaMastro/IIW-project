@@ -12,7 +12,7 @@
  *	*/			  
 
 
-#define SENDING_WINDOW	9		
+#define SENDING_WINDOW	8		
 #define Tsec			0
 #define Tnsec			20000000 //20 ms
 #define p 				40 //40% lost	

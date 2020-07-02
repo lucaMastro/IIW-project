@@ -3,7 +3,7 @@
 void send_syn(int sockfd, char *ip, int *new_ports){
 	struct sockaddr_in server_listen_addr;
 	Message syn, *syn_ack;
-	char *tmp, data[MSS];
+	char *tmp, data[12];
 	int cmd_port, data_port;
 
 	memset((void*) &server_listen_addr, 0, sizeof(server_listen_addr));
@@ -17,8 +17,10 @@ void send_syn(int sockfd, char *ip, int *new_ports){
 	connect(sockfd, (struct sockaddr*)&server_listen_addr,
 			sizeof(server_listen_addr) );
 
-	memset((void*)data, 0, MSS);
+	memset((void*)data, 0, 12);
 	send_data(sockfd, sockfd, NULL, SYN, data);
+	printf("data %s\n", data);
+
 	tmp = strtok(data, " ");
 	cmd_port = atoi(tmp);
 

@@ -192,7 +192,7 @@ void *waiting_for_ack(void *q){
 			exit(EXIT_FAILURE);
 		}
 		
-		if (! (ack -> flag & ACK | ack -> flag & SYN_ACK) ) {
+		if (! (ack -> flag & ACK || ack -> flag & SYN_ACK) ) {
 			if (ack -> flag & FIN){
 				printf("[Error]: connection closed server-side\n");
 				free(ack);
