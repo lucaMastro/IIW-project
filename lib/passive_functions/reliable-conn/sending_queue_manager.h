@@ -31,13 +31,13 @@ void initialize_struct(Sending_queue *queue){
 	queue -> buf = NULL;
 
 	queue -> on_fly_message_queue = (Message **)
-		malloc(sizeof(Message*) * RECEIVE_WINDOW);
+		malloc(sizeof(Message*) * SENDING_WINDOW);
 	if (queue -> on_fly_message_queue == NULL){
 		perror("error_in_malloc");
 		exit(EXIT_FAILURE);
 	}
 
-	for (i = 0; i < RECEIVE_WINDOW; i++){
+	for (i = 0; i < SENDING_WINDOW; i++){
 		queue -> on_fly_message_queue[i] = NULL;	
 	}
 
@@ -50,12 +50,12 @@ void retrasmission(Sending_queue *queue){
 	//printf("timed_out\n");
 	int i, on_fly = queue -> num_on_fly_pack;
 	Message *m;
-	int start_ind = queue -> send_base % RECEIVE_WINDOW;
+	int start_ind = queue -> send_base % SENDING_WINDOW;
 			
 	//printf("on fly: %d\n", queue -> num_on_fly_pack );
 
 	for (i = start_ind; i < start_ind + on_fly; i++){
-		m = queue -> on_fly_message_queue[i % RECEIVE_WINDOW];
+		m = queue -> on_fly_message_queue[i % SENDING_WINDOW];
 		if (m != NULL){		
 			//printf("packet %u\n\n", m -> seq_num);
 			if (!is_packet_lost())
@@ -275,7 +275,7 @@ void *waiting_for_ack(void *q){
 					start_timer.it_interval.tv_nsec	);*/
 
 #endif
-			freeding_pos = ack -> ack_num % RECEIVE_WINDOW;
+			freeding_pos = ack -> ack_num % SENDING_WINDOW;
 			to_ack = queue -> on_fly_message_queue[freeding_pos];
 
 			new_send_base = ack -> ack_num + 1;
@@ -302,7 +302,7 @@ void *waiting_for_ack(void *q){
 				}
 				memset((void*)queue -> buf, 0, ack -> length + 1);
 
-				memcpy(queue -> buf, ack -> list_data, ack -> length);
+				memcpy(queue -> buf, ack -> data, ack -> length);
 			}
 
 			//sblocco invio

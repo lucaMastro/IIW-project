@@ -57,7 +57,7 @@ void *make_packet(Message *mess_to_fill, void *read_data_from_here, int seq_num,
 
 	if (read_data_from_here != NULL){
 		if ( !(CHAR_INDICATOR & flag_to_set) ){
-			bytes_read = fread(mess_to_fill -> list_data, 1, MSS, (FILE*) read_data_from_here);
+			bytes_read = fread(mess_to_fill -> data, 1, MSS, (FILE*) read_data_from_here);
 			mess_to_fill -> length = bytes_read;
 		}
 		else{
@@ -65,7 +65,7 @@ void *make_packet(Message *mess_to_fill, void *read_data_from_here, int seq_num,
 			min = str_len < MSS ? str_len : MSS;
 
 			mess_to_fill -> length = min;
-			memcpy(mess_to_fill -> list_data, (unsigned char*) read_data_from_here, mess_to_fill -> length);
+			memcpy(mess_to_fill -> data, (unsigned char*) read_data_from_here, mess_to_fill -> length);
 			//in questo caso ritorno la posizione della stringa da cui continuare a leggere
 			return_addr = (unsigned char*)read_data_from_here + min;
 		}
@@ -122,7 +122,7 @@ ssize_t send_data(int data_sock, int cmd_sock, void *data, int type,
 		exit(EXIT_FAILURE);
 	}
 
-	if (semctl(sem, 0, SETVAL, RECEIVE_WINDOW) < 0){ 
+	if (semctl(sem, 0, SETVAL, SENDING_WINDOW) < 0){ 
 		perror("error initializing sem");
 		exit(EXIT_FAILURE);
 	}
@@ -154,7 +154,7 @@ ssize_t send_data(int data_sock, int cmd_sock, void *data, int type,
 		}
 		mex -> length = 0;
 		mex -> flag = type;
-		memset((void*) mex -> list_data, 0, MSS);
+		memset((void*) mex -> data, 0, MSS);
 
 		if ( (is_command = is_command_mex(mex)) ){
 			sending_sock = cmd_sock;
@@ -181,7 +181,7 @@ ssize_t send_data(int data_sock, int cmd_sock, void *data, int type,
 
 		//store the message in the queue:
 		//stampa_mess(mex);
-		queue -> on_fly_message_queue[mex -> seq_num % RECEIVE_WINDOW]	= mex;
+		queue -> on_fly_message_queue[mex -> seq_num % SENDING_WINDOW]	= mex;
 		//incremento seq_num
 		queue -> next_seq_num = (queue -> next_seq_num + 1) % MAX_SEQ_NUM;
 
@@ -242,7 +242,7 @@ void receive_data(int data_sock, int cmd_sock, void *write_here,
 		if (mex -> seq_num == expected_seq_num){
 			flag = mex -> flag;
 			if (mex -> length > 0){
-				write_data(mex, write_here, mex -> list_data, 
+				write_data(mex, write_here, mex -> data, 
 						&str_len, &old_str_len);	
 
 				ack.ack_num = expected_seq_num; 
@@ -341,7 +341,7 @@ void write_data(Message *mex, void *dest, unsigned char *src, int *str_len, int 
 			exit(EXIT_FAILURE);	
 		}
 		//memcpy( (*str_dest) + (*old_str_len), src, mex -> length);
-		memcpy( (*str_dest) + (*old_str_len), mex -> list_data, 
+		memcpy( (*str_dest) + (*old_str_len), mex -> data, 
 				mex -> length);
 
 		*(*str_dest + *str_len) = '\0';
@@ -469,7 +469,7 @@ int send_read_cmd(int cmd_sock, int data_sock, int cmd,
 			else if (flag & ACK){
 				if (rec -> length > 0 && flag & CHAR_INDICATOR)
 					printf("The file will be saved as %s on server.\n", 
-							rec -> list_data);
+							rec -> data);
 				break; //esco dal while
 			}
 		}

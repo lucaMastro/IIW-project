@@ -38,7 +38,7 @@ unsigned char *deserialize_header(Message *mex,unsigned char *buffer){
 
 void deserialize_data(Message *mex, unsigned char *buffer){
 
-	memcpy(mex -> list_data, buffer, mex -> length);
+	memcpy(mex -> data, buffer, mex -> length);
 }
 
 Message *deserialize_message(unsigned char *buffer){

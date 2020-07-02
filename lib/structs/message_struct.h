@@ -1,19 +1,6 @@
 //#include <stdint.h>
 //#include <stdio.h>
 
-/*	tra l'intervallo di numerazione I e la finestra di trasmissione N 
- *	deve valere:
- *			      I
- *			N <= ---
- *				  2
- *
- *	quindi se I è a k bit:
- *			
- *			N <= 2^(k - 1)
- *
- *		I è a 8 bit. allora N <= 2^7 = 128
- *	*/			  
-
 
 #ifndef MESSAGE_H
 # define MESSAGE_H 
@@ -39,6 +26,6 @@ typedef struct message{
 	uint8_t ack_num;
 	uint16_t flag;
 	uint16_t length;
-	unsigned char list_data[MSS];
+	unsigned char data[MSS];
 } Message;
 #endif

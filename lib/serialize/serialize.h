@@ -1,5 +1,4 @@
 
-//#include "../structs/message_struct.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -17,12 +16,6 @@ unsigned char *serialize_ack_num(Message *mex, unsigned char *buffer){
 	return buffer + 1;
 }
 
-/*
-unsigned char *serialize_ack_num(Message *mex, unsigned char *buffer){
-	memcpy(buffer, &(mex -> seq_ack_num), 1);
-
-	return buffer + 1;
-}*/
 
 
 unsigned char *serialize_flag(Message *mex,unsigned char *buffer){
@@ -30,12 +23,6 @@ unsigned char *serialize_flag(Message *mex,unsigned char *buffer){
 	return buffer + 2;
 }
 
-
-/*unsigned char *serialize_rec_win(Message *mex,unsigned char *buffer){
-	memcpy(buffer, &(mex -> rec_win), 2);
-
-	return buffer + 2;
-}*/
 
 unsigned char *serialize_length(Message *mex,unsigned char *buffer){
 	memcpy(buffer, &(mex -> length), 2);
@@ -48,7 +35,6 @@ unsigned char *serialize_header(Message *mex,unsigned char *buffer){
 	unsigned char *tmp = buffer;
 	tmp = serialize_seq_num(mex, tmp);
 	tmp = serialize_ack_num(mex, tmp);
-	//tmp = serialize_seq_ack(mex, tmp);
 	tmp = serialize_flag(mex, tmp);
 	tmp = serialize_length(mex, tmp);
 
@@ -57,7 +43,7 @@ unsigned char *serialize_header(Message *mex,unsigned char *buffer){
 
 
 void serialize_data(Message *mex, unsigned char *buffer){
-	memcpy(buffer, mex -> list_data, mex -> length);
+	memcpy(buffer, mex -> data, mex -> length);
 }
 
 

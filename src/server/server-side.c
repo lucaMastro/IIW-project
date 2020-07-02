@@ -216,9 +216,9 @@ void *thread_function(void * params){
 			case GET:
 
 				printf("get case received\n");
-				printf("Request of download for '%s' \n", cmd -> list_data);
+				printf("Request of download for '%s' \n", cmd -> data);
 				//send ack only if file exists
-				server_get_operation(cmd_sock, data_sock, cmd -> list_data);
+				server_get_operation(cmd_sock, data_sock, cmd -> data);
 				
 				break;
 
@@ -228,9 +228,9 @@ void *thread_function(void * params){
 				printf("put case received\n");
 				//in put case, client must receive the ack to know
 				//when server is ready to receive
-				printf("Request of upload for '%s'\n", cmd -> list_data);
+				printf("Request of upload for '%s'\n", cmd -> data);
 				server_put_operation(cmd_sock, data_sock, 
-						cmd -> list_data, semaphore);
+						cmd -> data, semaphore);
 				break;
 
 			case FIN:

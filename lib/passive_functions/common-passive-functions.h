@@ -10,7 +10,7 @@ void stampa_mess(Message *mex){
 	printf("length:  %u\n", mex -> length);
 	
 	if ((mex -> flag & CHAR_INDICATOR) == CHAR_INDICATOR)
-		printf("data:    %s\n", mex -> list_data);
+		printf("data:    %s\n", mex -> data);
 }
 
 

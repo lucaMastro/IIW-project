@@ -1,6 +1,20 @@
-#define RECEIVE_WINDOW	8		
+/*	tra l'intervallo di numerazione I e la finestra di trasmissione N 
+ *	deve valere:
+ *			      I
+ *			N <= ---
+ *				  2
+ *
+ *	quindi se I è a k bit:
+ *			
+ *			N <= 2^(k - 1)
+ *
+ *		I è a 8 bit. allora N <= 2^7 = 128
+ *	*/			  
+
+
+#define SENDING_WINDOW	9		
 #define Tsec			0
-#define Tnsec			2000000 //2 ms
+#define Tnsec			20000000 //20 ms
 #define p 				40 //40% lost	
 
 #ifdef ADAPT_TO
