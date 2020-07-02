@@ -19,18 +19,6 @@ void send_syn(int sockfd, char *ip, int *new_ports){
 
 	memset((void*)data, 0, MSS);
 	send_data(sockfd, sockfd, NULL, SYN, data);
-	/*
-	make_packet(&syn, NULL, 0, 0, SYN);
-	send_packet(sockfd, &syn, &server_listen_addr);
-
-	//waiting for synack
-	syn_ack = receive_packet(sockfd, NULL);
-	if (syn_ack == NULL){
-		perror("error receiving syn_ack");
-		exit(EXIT_FAILURE);
-	}*/
-
-	//tmp = strtok((char*) syn_ack -> list_data, " ");
 	tmp = strtok(data, " ");
 	cmd_port = atoi(tmp);
 

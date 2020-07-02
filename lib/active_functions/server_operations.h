@@ -7,9 +7,8 @@
 #include <sys/ipc.h>
 #include <sys/sem.h>
 #include <dirent.h>
-//#include "../readwrite/read-write.h" 
 
-#define SERVER_FOLDER "src/server/server-files/"
+#define SERVER_FOLDER "server-files/"
 
 int check_for_existing_file(int semaphore, char *path, 
 		FILE **to_create, char **new_name){

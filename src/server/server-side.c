@@ -32,7 +32,7 @@ extern int h_errno;
 #define SERV_PORT   5193 
 #define DIM_FILE_LIST 200
 #define MAX_PORT_NUMBER 200
-#define SERVER_FOLDER "src/server/server-files/"
+//#define SERVER_FOLDER "src/server/server-files/"
 
 typedef struct thread_params{
 

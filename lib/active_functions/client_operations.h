@@ -6,7 +6,7 @@
 
 //#include "../readwrite/read-write.h"
 
-#define CLIENT_FOLDER "src/client/client-files/"
+#define CLIENT_FOLDER "client-files/"
 
 extern int h_errno;
 
