@@ -43,6 +43,7 @@ typedef struct thread_params{
 
 
 
+
 int check_port(int port, int * array){
 	int i; 
     for(i = 0; i < MAX_PORT_NUMBER; i++){ 
@@ -85,7 +86,7 @@ void generate_port(int *array_port, int *new_port_nums){
 
 __thread int cmd_sock;
 __thread int data_sock;
-
+__thread struct thread_params *my_params;
 
 
 void delete_ports(int cmd_port, int data_port, int *array_ports){
@@ -97,11 +98,22 @@ void delete_ports(int cmd_port, int data_port, int *array_ports){
 	}
 }
 
+void release_resources(){
+	close(cmd_sock);
+	close(data_sock);
+	delete_ports(my_params -> port_numbers[0], my_params -> port_numbers[1],
+			my_params -> array_port);
+	free(my_params);
+	pthread_exit(0);
+}
+
+
+
 void *thread_function(void * params){
 	int semaphore;
-	struct thread_params *my_params;
 	int flag;
 	int cmd_port, data_port;
+	timer_t conn_timer;
 
 	struct sockaddr_in cmd_addr_thread, data_addr_thread;
 	const socklen_t size = sizeof(struct sockaddr_in);
@@ -151,13 +163,28 @@ void *thread_function(void * params){
 		exit(EXIT_FAILURE);
 	}
 	
-	manage_connection_request(cmd_sock, data_sock);
+	sigset_t thread_set;
+	sigemptyset(&thread_set);
+	pthread_sigmask(SIG_SETMASK, &thread_set, NULL);
+	signal(SIGALRM, release_resources);
+
+	manage_connection_request(cmd_sock, data_sock, &conn_timer);
+
+	
+	struct itimerspec timer;
+	timer.it_value.tv_sec = 300; //5 minutes timer
+	timer.it_value.tv_nsec = 0;
+	timer.it_interval.tv_sec = 0;
+	timer.it_interval.tv_nsec = 0;
+
+//	signal(SIGALRM, release_resources);
 
 	//waiting for command
 	Message *cmd, ack;
 
 	make_packet(&ack, NULL, 0, 0, ACK);
 	while(1){
+		timer_settime(conn_timer, 0, &timer, NULL);
 
 		printf("\nServer waitings for command\n");
 
@@ -215,12 +242,12 @@ void *thread_function(void * params){
 				if (!is_packet_lost())
 					send_packet(cmd_sock, &ack, NULL);
 
-				close(cmd_sock);
-				close(data_sock);
+			//	close(cmd_sock);
+			//	close(data_sock);
+			//	delete_ports(cmd_port, data_port, my_params -> array_port);
 				free(cmd);
-				delete_ports(cmd_port, data_port, my_params -> array_port);
-				free(my_params);
-				pthread_exit(0);
+			//	free(my_params);
+				release_resources();
 		}
 
 		//it's allocate in each PUT-GET-LIST request
@@ -247,6 +274,13 @@ int main(int argc, char **argv) {
 	int flag;
 	int semaphore; //sempahore to check name files in put requests
 	
+	//ignoring sigalarm on this thread
+	sigset_t sigset;
+	sigemptyset(&sigset);
+	sigaddset(&sigset, SIGALRM);
+	pthread_sigmask(SIG_SETMASK, &sigset, NULL);
+
+
 	if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) { /* crea il socket */
 		perror("errore in socket");
 		exit(1);

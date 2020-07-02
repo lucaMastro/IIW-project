@@ -40,7 +40,7 @@ void send_syn(int sockfd, char *ip, int *new_ports);
 void make_connection(int sockfd, char *ip, int *cmd_sock, int *data_sock);
 //server-passive.h
 void timer_handler(int signo);
-void manage_connection_request(int cmd_sock, int data_sock);
+void manage_connection_request(int cmd_sock, int data_sock, timer_t *conn_timer);
 
 //reliable_conn
 void initialize_struct(Sending_queue *queue);

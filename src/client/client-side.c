@@ -148,8 +148,8 @@ int main(int argc, char *argv[ ]) {
 	printf("Welcome to udt-reliable go-back-n ftp protocol.\n");
 	printf("You can use these operation:\n");
 	printf("\t1. List, by running\n\tls\n\n");
-	printf("\t2. Get, by running\n\tget <name_with_wich_file_is_store_on_server> <name_with_wich_save_file>\n\n");
-	printf("\t3. Put, by running\n\tput <local_file_name> <name_with_wich save_file_on_server>\n\n");
+	printf("\t2. Get, by running\n\tget <name_with_wich_file_is_store_on_server> [<name_with_wich_save_file>]\n\n");
+	printf("\t3. Put, by running\n\tput <local_file_name> [<name_with_wich save_file_on_server>]\n\n");
 	printf("\t4. Exit, by running\n\texit\n\n");
 	printf("\t5. Clean, to clear the shell, by running\n\tclear\n\n");
 	while (1){
