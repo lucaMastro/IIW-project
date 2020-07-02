@@ -1,5 +1,5 @@
-all: clean compile
-adapt: clean compile-adaptive
+all: compile
+adapt: compile-adaptive
 
 compile: 
 	gcc -o server src/server/server-side.c -pthread -lrt
