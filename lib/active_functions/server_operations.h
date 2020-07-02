@@ -108,7 +108,11 @@ void server_put_operation(int cmd_sock, int data_sock, char *file_name, int sem_
 	if (new_file_name != NULL)
 		free(new_file_name);
 
-	struct timeval to;
+	if (!is_packet_lost())
+		send_packet(cmd_sock, &ack, NULL);
+	check_last_ack(cmd_sock, cmd_sock, &ack);
+
+	/*struct timeval to;
 	to.tv_sec = (Tsec) << 2;
 	to.tv_usec = (Tnsec / 1000) << 2;
 	while(1) {
@@ -131,7 +135,7 @@ void server_put_operation(int cmd_sock, int data_sock, char *file_name, int sem_
 	}
 	to.tv_sec = 0;
 	to.tv_usec = 0;
-	setsockopt(cmd_sock, SOL_SOCKET, SO_RCVTIMEO, &to, sizeof(to));
+	setsockopt(cmd_sock, SOL_SOCKET, SO_RCVTIMEO, &to, sizeof(to));*/
 
 	receive_data(data_sock, cmd_sock, file_received, NULL);
 	if (fclose(file_received) == EOF){
@@ -160,7 +164,11 @@ void server_get_operation(int cmd_sock, int data_sock, char *file_requested){
 			//send error message
 			make_packet(&mex, NULL, 0, 0, ACK | FILE_NOT_FOUND);
 			Message *m;
-			struct timeval to;
+			if (!is_packet_lost())
+				send_packet(cmd_sock, &mex, NULL);
+			check_last_ack(cmd_sock, cmd_sock, &mex);
+
+			/*struct timeval to;
 			to.tv_sec = (Tsec) << 2;
 			to.tv_usec = (Tnsec / 1000) << 2;
 
@@ -185,7 +193,7 @@ void server_get_operation(int cmd_sock, int data_sock, char *file_requested){
 			}
 			to.tv_sec = 0;
 			to.tv_usec = 0;
-			setsockopt(cmd_sock, SOL_SOCKET, SO_RCVTIMEO, &to, sizeof(to));
+			setsockopt(cmd_sock, SOL_SOCKET, SO_RCVTIMEO, &to, sizeof(to));*/
 			return;
 		}
 		else{
