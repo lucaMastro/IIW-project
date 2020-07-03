@@ -180,10 +180,11 @@ ssize_t send_data(int data_sock, int cmd_sock, void *data, int type,
 		//sending_sock = (is_command_mex(mex) ) ? cmd_sock : data_sock;
 
 		//store the message in the queue:
-		//stampa_mess(mex);
+//		stampa_mess(mex);
+//		printf("\n");
 		queue -> on_fly_message_queue[mex -> seq_num % SENDING_WINDOW]	= mex;
 		//incremento seq_num
-		queue -> next_seq_num = (queue -> next_seq_num + 1) % MAX_SEQ_NUM;
+		queue -> next_seq_num = (queue -> next_seq_num + 1) % (MAX_SEQ_NUM + 1);
 
 		if ( !is_packet_lost() )
 			send_packet(sending_sock, mex, NULL);
@@ -245,7 +246,7 @@ void receive_data(int data_sock, int cmd_sock, void *write_here,
 						&str_len, &old_str_len);	
 			
 			ack.ack_num = expected_seq_num; 
-			expected_seq_num = (expected_seq_num + 1) % MAX_SEQ_NUM;
+			expected_seq_num = (expected_seq_num + 1) % (MAX_SEQ_NUM + 1);
 		}
 
 		if ( !is_packet_lost() )
