@@ -184,7 +184,9 @@ void *thread_function(void * params){
 
 	make_packet(&ack, NULL, 0, 0, ACK);
 	while(1){
+#ifndef GET_TIME
 		timer_settime(conn_timer, 0, &timer, NULL);
+#endif
 
 		printf("\nServer waitings for command\n");
 

@@ -20,6 +20,41 @@ __thread struct itimerspec start_timer;
 #endif
 
 
+int is_in_window(uint8_t ack_num){
+	//printf("\ncheck for ack num = %u\n", ack_num);
+	uint8_t base = queue -> send_base;
+	int i;
+	for (i = 0; i < SENDING_WINDOW; i++ ){
+		if ( (base + i) % (MAX_SEQ_NUM + 1) == ack_num){
+	//		printf("in window\n");
+			return 1;	
+		}
+	}
+	//printf("not in window\n");
+	return 0;
+}
+
+void free_mex_and_update_base(uint8_t ack_num){
+	uint8_t old_base = queue -> send_base;
+	uint8_t new_send_base = (ack_num + 1) % (MAX_SEQ_NUM + 1);
+	int i;
+	Message *to_ack;
+
+	for (i = old_base; i != new_send_base; i = (i + 1) % (MAX_SEQ_NUM + 1)){
+		//printf("i = %u, new_base = %u\n", i, new_send_base);
+		to_ack = queue -> on_fly_message_queue[i];
+		free(to_ack);
+		to_ack = NULL;
+		queue -> num_on_fly_pack--; //diminuisco numero pacchetti in volo
+	}
+	//in general, i can ack more packets with an ack: then the 
+	//flying packets can be decremented of more than 1 for ack.
+	//the differents beetwen the new send-base and the old send-base
+	//is the number of packet i aim to ack
+	queue -> send_base = new_send_base;
+
+}
+
 
 void initialize_struct(Sending_queue *queue){
 	int i;
@@ -31,13 +66,13 @@ void initialize_struct(Sending_queue *queue){
 	queue -> buf = NULL;
 
 	queue -> on_fly_message_queue = (Message **)
-		malloc(sizeof(Message*) * SENDING_WINDOW);
+		malloc(sizeof(Message*) * MAX_SEQ_NUM + 1);
 	if (queue -> on_fly_message_queue == NULL){
 		perror("error_in_malloc");
 		exit(EXIT_FAILURE);
 	}
 
-	for (i = 0; i < SENDING_WINDOW; i++){
+	for (i = 0; i < MAX_SEQ_NUM +1; i++){
 		queue -> on_fly_message_queue[i] = NULL;	
 	}
 
@@ -50,20 +85,24 @@ void retrasmission(Sending_queue *queue){
 	//printf("timed_out\n");
 	int i, on_fly = queue -> num_on_fly_pack;
 	Message *m;
-	int start_ind = queue -> send_base % SENDING_WINDOW;
+	int start_ind = queue -> send_base;
 			
 	//printf("on fly: %d\n", queue -> num_on_fly_pack );
+	//printf("starti = %d\n", start_ind);
 
 	for (i = start_ind; i < start_ind + on_fly; i++){
-		m = queue -> on_fly_message_queue[i % SENDING_WINDOW];
+		m = queue -> on_fly_message_queue[i % (MAX_SEQ_NUM + 1)];
 		if (m != NULL){		
 			//printf("packet %u\n\n", m -> seq_num);
 			if (!is_packet_lost())
 				send_packet(queue -> data_sock, m, NULL);
 			//printf("rx seq_num = %u\n", m -> seq_num);
 		}
-		else
+		else{
+			//printf("m == NULL\n");
 			break;
+			
+		}
 	}
 
 
@@ -164,8 +203,8 @@ void *waiting_for_ack(void *q){
 #endif
 	start_timer.it_value.tv_sec = Tsec;
 	start_timer.it_value.tv_nsec = Tnsec;
-	start_timer.it_interval.tv_sec = Tsec;
-	start_timer.it_interval.tv_nsec = Tnsec;
+	start_timer.it_interval.tv_sec = 0;
+	start_timer.it_interval.tv_nsec = 0;
 
 	struct itimerspec stop_timer;
 	stop_timer.it_value.tv_sec = 0;
@@ -195,19 +234,23 @@ void *waiting_for_ack(void *q){
 		if (! (ack -> flag & ACK || ack -> flag & SYN_ACK) ) {
 			if (ack -> flag & FIN){
 				printf("[Error]: connection closed server-side\n");
-				free(ack);
+				//free(ack);
 				exit(EXIT_FAILURE);
 			}
-			free(ack);
+			//free(ack);
 			continue;
 		}
 	
 		//ack -> ack num is the seq_num of the packet
 		//i have to ack. the first packet has seq_num == 1,
 
-		if ( ack -> ack_num < queue -> send_base)continue; //ack_duplicato
+		//stampa_mess(ack);
+		if (!is_in_window(ack -> ack_num))
+			continue;
 		else{ //nuovo ack
 			//disattivo timer:
+			//printf("controllo passato: %u\nsb = %u\n\n", ack -> ack_num, 
+			//		queue -> send_base);
 
 #ifndef ADAPT_TO
 			if (timer_settime(timer_id, 0, &stop_timer, NULL) < 0){
@@ -264,8 +307,8 @@ void *waiting_for_ack(void *q){
 			}
 			
 			
-			start_timer.it_interval.tv_sec =start_timer.it_value.tv_sec;
-			start_timer.it_interval.tv_nsec =start_timer.it_value.tv_nsec;
+//			start_timer.it_interval.tv_sec =start_timer.it_value.tv_sec;
+//			start_timer.it_interval.tv_nsec =start_timer.it_value.tv_nsec;
 
 		/*	printf("normal start timer:\n");
 			printf("%lu\n%lu\n%lu\n%lu\n\n", 
@@ -275,21 +318,32 @@ void *waiting_for_ack(void *q){
 					start_timer.it_interval.tv_nsec	);*/
 
 #endif
-			freeding_pos = ack -> ack_num % SENDING_WINDOW;
-			to_ack = queue -> on_fly_message_queue[freeding_pos];
+			//freeding_pos = ack -> ack_num % SENDING_WINDOW;
+			//freeding_pos = ack -> ack_num;
+			to_ack = queue -> on_fly_message_queue[ack -> ack_num];
+		//	stampa_mess(to_ack);
+			//printf("seq_num = %u\nfreed_pos %d\n", to_ack -> seq_num, freeding_pos);
 
+			was_last = (to_ack -> flag & END_OF_DATA);
+
+			//printf("ok\n");
+			free_mex_and_update_base( ack -> ack_num);
+			//printf("ok\n");
+			/*
 			new_send_base = ack -> ack_num + 1;
 			//in general, i can ack more packets with an ack: then the 
 			//flying packets can be decremented of more than 1 for ack.
 			//the differents beetwen the new send-base and the old send-base
 			//is the number of packet i aim to ack
 			queue -> num_on_fly_pack -= new_send_base - queue -> send_base;
+			new_send_base = new_send_base % (MAX_SEQ_NUM + 1);
 			
-			was_last = (to_ack -> flag & END_OF_DATA);
 			free(to_ack);
 			to_ack = NULL;
 
+			printf("nsb %u\n", new_send_base);
 			queue -> send_base = new_send_base;
+			*/
 
 			//check if have to read data from ack: only in cmd mex
 			if (queue -> should_read_data){

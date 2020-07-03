@@ -185,8 +185,12 @@ int main(int argc, char *argv[ ]) {
 				exit(EXIT_SUCCESS);
 			}
 		}
-		else
+		else{
 			valid_cmd = manage_cmd_line(command, data_sock, cmd_sock);
+#ifdef GET_TIME
+			exit(0);
+#endif
+		}
 	}
 
 	exit(0);

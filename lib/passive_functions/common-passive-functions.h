@@ -11,6 +11,7 @@ void stampa_mess(Message *mex){
 	
 	if ((mex -> flag & CHAR_INDICATOR) == CHAR_INDICATOR)
 		printf("data:    %s\n", mex -> data);
+	printf("\n");
 }
 
 

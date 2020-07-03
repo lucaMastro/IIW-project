@@ -12,13 +12,14 @@
  *	*/			  
 
 
-#define SENDING_WINDOW	8		
-#define Tsec			0
-#define Tnsec			20000000 //20 ms
-#define p 				40 //40% lost	
+
+#define SENDING_WINDOW	50	
+#define Tsec			0	
+#define Tnsec			50000000 //20 ms
+#define p 				35 //% lost	
 
 #ifdef ADAPT_TO
-#define Tmin	2000000 //2 ms
+#define Tmin	1000000 //2 ms
 #define a 	0.125  
 #define b 	0.25
 #endif
