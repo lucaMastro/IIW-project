@@ -1,13 +1,8 @@
-//#include <stdint.h>
-//#include <stdio.h>
-
-
-#ifndef MESSAGE_H
-# define MESSAGE_H 
 	
-#define HEADER_SIZE 	6	
-#define MSS				500
-#define MAX_SEQ_NUM 	255
+#define HEADER_SIZE		 	6	
+#define MSS					500
+#define MAX_SEQ_NUM 		255
+
 
 #define SYN 				1
 #define SYN_ACK 			2
@@ -28,4 +23,3 @@ typedef struct message{
 	uint16_t length;
 	unsigned char data[MSS];
 } Message;
-#endif

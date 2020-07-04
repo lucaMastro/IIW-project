@@ -1,8 +1,3 @@
-//#include "../structs/message_struct.h"
-#include <stdlib.h>
-#include <string.h>
-
-
 unsigned char *deserialize_seq_num(Message *mex, unsigned char *buffer){
 	memcpy(&(mex -> seq_num), buffer,1);
 

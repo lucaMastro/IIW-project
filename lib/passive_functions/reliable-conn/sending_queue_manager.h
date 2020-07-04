@@ -1,47 +1,44 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <errno.h>
-#include <string.h>
-#include <sys/ipc.h>
-#include <sys/sem.h>
-#include <sys/types.h> 
 
-//#include "../../structs/message_struct.h"
-//#include "../../structs/sending_queue.h"
-
-
+//thread local starages: so that operations on this variables  are atomic
 __thread Sending_queue *queue;
 __thread timer_t timer_id;
 
 #ifdef ADAPT_TO
 #include <math.h>
-__thread struct itimerspec start_timer;
+__thread struct itimerspec start_timer; //if timer is adaptive, it must be
+										//reachable by retrasmission 
+										//handler. it should be global, but
+										//reentrant
 #endif
 
 
 int is_in_window(uint8_t ack_num){
-	//printf("\ncheck for ack num = %u\n", ack_num);
+	//this function checks if the ack_num is currentily in the trasmission
+	//window. just check num by num from send_base if the numer is in the 
+	//window.
+	
 	uint8_t base = queue -> send_base;
 	int i;
-	for (i = 0; i < SENDING_WINDOW; i++ ){
-		if ( (base + i) % (MAX_SEQ_NUM + 1) == ack_num){
-	//		printf("in window\n");
-			return 1;	
-		}
+	for (i = 0; i < SENDING_WINDOW; i++ ){ //sending_window times
+		if ( (base + i) % (MAX_SEQ_NUM + 1) == ack_num)
+			return 1;	//its in window
 	}
-	//printf("not in window\n");
-	return 0;
+	return 0; //not in window
 }
 
 void free_mex_and_update_base(uint8_t ack_num){
+	//this function is called when a new ack is received. in that case, 
+	//because of comulative ack, it can ack multiple packets. this function
+	//start a cycle from send_base and free stored mex until 
+	//stored_mex.seq_num == ack_num
+	//it also update send_base, adding 1 for each acked mex.
+	
 	uint8_t old_base = queue -> send_base;
 	uint8_t new_send_base = (ack_num + 1) % (MAX_SEQ_NUM + 1);
 	int i;
 	Message *to_ack;
 
 	for (i = old_base; i != new_send_base; i = (i + 1) % (MAX_SEQ_NUM + 1)){
-		//printf("i = %u, new_base = %u\n", i, new_send_base);
 		to_ack = queue -> on_fly_message_queue[i];
 		free(to_ack);
 		to_ack = NULL;
@@ -52,7 +49,6 @@ void free_mex_and_update_base(uint8_t ack_num){
 	//the differents beetwen the new send-base and the old send-base
 	//is the number of packet i aim to ack
 	queue -> send_base = new_send_base;
-
 }
 
 
@@ -65,6 +61,7 @@ void initialize_struct(Sending_queue *queue){
 	queue -> should_read_data = 0;
 	queue -> buf = NULL;
 
+	//initializing queue 
 	queue -> on_fly_message_queue = (Message **)
 		malloc(sizeof(Message*) * MAX_SEQ_NUM + 1);
 	if (queue -> on_fly_message_queue == NULL){
@@ -72,43 +69,37 @@ void initialize_struct(Sending_queue *queue){
 		exit(EXIT_FAILURE);
 	}
 
+	//set all message* NULL
 	for (i = 0; i < MAX_SEQ_NUM +1; i++){
 		queue -> on_fly_message_queue[i] = NULL;	
 	}
-
 }
 
 
 
 void retrasmission(Sending_queue *queue){
-	//ciclo da send base e ritrasmetto i mess:
-	//printf("timed_out\n");
+	//starting from send_base, this function will retrasmits as much messages
+	//as queue -> num_on_fly_pack is.
+	
 	int i, on_fly = queue -> num_on_fly_pack;
 	Message *m;
 	int start_ind = queue -> send_base;
 			
-	//printf("on fly: %d\n", queue -> num_on_fly_pack );
-	//printf("starti = %d\n", start_ind);
-
 	for (i = start_ind; i < start_ind + on_fly; i++){
 		m = queue -> on_fly_message_queue[i % (MAX_SEQ_NUM + 1)];
 		if (m != NULL){		
-			//printf("packet %u\n\n", m -> seq_num);
 			if (!is_packet_lost())
 				send_packet(queue -> data_sock, m, NULL);
-			//printf("rx seq_num = %u\n", m -> seq_num);
 		}
-		else{
-			//printf("m == NULL\n");
+		else
 			break;
-			
-		}
 	}
 
 
 #ifdef ADAPT_TO
 	//rx, raddoppio timer, inutile ai fini di test: non c'è ritardo, ma 
 	//solo perdita
+	
 /*	start_timer.it_value.tv_nsec = start_timer.it_value.tv_nsec << 1;
 	if (start_timer.it_value.tv_nsec > 999999999){
 		start_timer.it_value.tv_sec += 1; 
@@ -123,13 +114,15 @@ void retrasmission(Sending_queue *queue){
 			start_timer.it_value.tv_nsec < Tmin)
 		start_timer.it_value.tv_nsec = Tmin;
 
-/*			printf("rx start timer:\n");
+/*			DEBUGGING PRINTF
+ * 			printf("rx start timer:\n");
 			printf("%lu\n%lu\n%lu\n%lu\n\n", 
 					start_timer.it_value.tv_sec,
 					start_timer.it_value.tv_nsec,
 					start_timer.it_interval.tv_sec,
 					start_timer.it_interval.tv_nsec	);*/
 #else
+	//initialize a new static timer only if not adaptive case
 	struct itimerspec start_timer;
 	start_timer.it_value.tv_sec = Tsec;
 	start_timer.it_value.tv_nsec = Tnsec;
@@ -147,18 +140,15 @@ void retrasmission(Sending_queue *queue){
 
 
 void retrasmission_handler(int signo){
-	//printf("timed out\n");
 	retrasmission(queue);
 }
 
 
 void *waiting_for_ack(void *q){
+
 	queue = (Sending_queue*) q;
 
-	//printf("starting thread\n");
 	int sem = queue -> semaphore;
-	int new_send_base = 0;
-	int freeding_pos;
 	int was_last = 0;
 	Message *to_ack;
 
@@ -171,6 +161,7 @@ void *waiting_for_ack(void *q){
 
 #ifdef ADAPT_TO
 
+	//it needs this variable only in adaptive timer case
 	struct itimerspec estimatedRTT;
 	struct itimerspec sampleRTT;
 	struct itimerspec oldRTT;
@@ -188,9 +179,8 @@ void *waiting_for_ack(void *q){
 	sampleDEV.it_value.tv_nsec = 0;
 	
 #endif
-
-
-
+	
+	//chosed SIGUSR1 as a signal of retrasmission
 	signal(SIGUSR1, retrasmission_handler);  
 	
 	struct sigevent se;	
@@ -199,8 +189,12 @@ void *waiting_for_ack(void *q){
 	se.sigev_signo = SIGUSR1;
 
 #ifndef ADAPT_TO
+	//declare a struct only if not adaptive case. in fact, if timer is 
+	//adaptive, its a global thread local storage variable
 	struct itimerspec start_timer;
 #endif
+
+	//initializing timer in both cases at costant value
 	start_timer.it_value.tv_sec = Tsec;
 	start_timer.it_value.tv_nsec = Tnsec;
 	start_timer.it_interval.tv_sec = 0;
@@ -212,17 +206,18 @@ void *waiting_for_ack(void *q){
 	stop_timer.it_interval.tv_sec = 0;
 	stop_timer.it_interval.tv_nsec = 0;
 
+	//creating timer
 	if (timer_create(CLOCK_REALTIME, &se, &timer_id) < 0){
 		perror("error in timer_create");
 		exit(EXIT_FAILURE);
 	}
 
+	//starting timer
 	if (timer_settime(timer_id, 0, &start_timer, NULL) < 0){
 		perror("error in starting timer");
 		exit(EXIT_FAILURE);
 	}
 
-//	printf("thread rx on sock %d\n", queue -> cmd_sock);
 	do{
 
 		ack = receive_packet(queue -> cmd_sock, NULL);
@@ -234,24 +229,19 @@ void *waiting_for_ack(void *q){
 		if (! (ack -> flag & ACK || ack -> flag & SYN_ACK) ) {
 			if (ack -> flag & FIN){
 				printf("[Error]: connection closed server-side\n");
-				//free(ack);
+				free(ack);
 				exit(EXIT_FAILURE);
 			}
-			//free(ack);
+			free(ack);
 			continue;
 		}
-	
-		//ack -> ack num is the seq_num of the packet
-		//i have to ack. the first packet has seq_num == 1,
 
-		//stampa_mess(ack);
-		if (!is_in_window(ack -> ack_num))
+		if (!is_in_window(ack -> ack_num)) //acking only if new ack received
 			continue;
-		else{ //nuovo ack
-			//disattivo timer:
-			//printf("controllo passato: %u\nsb = %u\n\n", ack -> ack_num, 
-			//		queue -> send_base);
 
+		else{ //new ack
+
+			//disattivo timer:
 #ifndef ADAPT_TO
 			if (timer_settime(timer_id, 0, &stop_timer, NULL) < 0){
 				perror("error in stopping timer");
@@ -265,11 +255,14 @@ void *waiting_for_ack(void *q){
 				perror("error in stopping timer");
 				exit(EXIT_FAILURE);
 			}
+			//old rtt will contain a copy of the previous timer
 			if (timer_settime(timer_id, 0, &stop_timer, &oldRTT) < 0){
 				perror("error in stopping timer");
 				exit(EXIT_FAILURE);
 			}
 
+			//calculating just like tcp
+			//each operation is done on .tv_sec and .tv_nsec field
 			sampleRTT.it_value.tv_sec = oldRTT.it_value.tv_sec - 
 				sampleRTT.it_value.tv_sec;
 			sampleRTT.it_value.tv_nsec = oldRTT.it_value.tv_nsec - 
@@ -301,15 +294,14 @@ void *waiting_for_ack(void *q){
 			
 			start_timer.it_value.tv_nsec = estimatedRTT.it_value.tv_nsec;
 			start_timer.it_value.tv_nsec += devRTT.it_value.tv_nsec << 2; 
+
+			//moving nanosec to sec, if possible
 			while (start_timer.it_value.tv_nsec > 999999999){
 				start_timer.it_value.tv_sec += 1; 
 				start_timer.it_value.tv_nsec -= 1000000000; 
 			}
 			
 			
-//			start_timer.it_interval.tv_sec =start_timer.it_value.tv_sec;
-//			start_timer.it_interval.tv_nsec =start_timer.it_value.tv_nsec;
-
 		/*	printf("normal start timer:\n");
 			printf("%lu\n%lu\n%lu\n%lu\n\n", 
 					start_timer.it_value.tv_sec,
@@ -317,33 +309,18 @@ void *waiting_for_ack(void *q){
 					start_timer.it_interval.tv_sec,
 					start_timer.it_interval.tv_nsec	);*/
 
-#endif
-			//freeding_pos = ack -> ack_num % SENDING_WINDOW;
-			//freeding_pos = ack -> ack_num;
-			to_ack = queue -> on_fly_message_queue[ack -> ack_num];
-		//	stampa_mess(to_ack);
-			//printf("seq_num = %u\nfreed_pos %d\n", to_ack -> seq_num, freeding_pos);
+			if (start_timer.it_value.tv_sec == 0 &&
+				start_timer.it_value.tv_nsec < Tmin)
+			start_timer.it_value.tv_nsec = Tmin;
 
+#endif
+			//getting flag of message to ack. check for ending while is done
+			//on that flag. if it got the ack of the last packet, doesnt wait
+			//anymore
+			to_ack = queue -> on_fly_message_queue[ack -> ack_num];
 			was_last = (to_ack -> flag & END_OF_DATA);
 
-			//printf("ok\n");
 			free_mex_and_update_base( ack -> ack_num);
-			//printf("ok\n");
-			/*
-			new_send_base = ack -> ack_num + 1;
-			//in general, i can ack more packets with an ack: then the 
-			//flying packets can be decremented of more than 1 for ack.
-			//the differents beetwen the new send-base and the old send-base
-			//is the number of packet i aim to ack
-			queue -> num_on_fly_pack -= new_send_base - queue -> send_base;
-			new_send_base = new_send_base % (MAX_SEQ_NUM + 1);
-			
-			free(to_ack);
-			to_ack = NULL;
-
-			printf("nsb %u\n", new_send_base);
-			queue -> send_base = new_send_base;
-			*/
 
 			//check if have to read data from ack: only in cmd mex
 			if (queue -> should_read_data){
@@ -359,11 +336,13 @@ void *waiting_for_ack(void *q){
 				memcpy(queue -> buf, ack -> data, ack -> length);
 			}
 
-			//sblocco invio
+			//unlock sender operation releasing a coin
 			if (semop(sem, &sops, 1) < 0){
 				perror("error unlocking semaphore");
 				exit(EXIT_FAILURE);
 			}
+
+			//restarting timer
 			if (timer_settime(timer_id, 0, &start_timer, NULL) < 0){
 				perror("error in starting timer");
 				exit(EXIT_FAILURE);
@@ -371,9 +350,10 @@ void *waiting_for_ack(void *q){
 		}
 
 		free(ack);
-	}while(was_last == 0); //ho ricevuto ack dell'ultimo
-//	printf("exited from ack thread\n");
+	}
+	while(was_last == 0); 
 
+	//deleting timer and terminating thread execution
 	timer_delete(timer_id);
 	pthread_exit(NULL);
 }

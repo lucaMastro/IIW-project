@@ -62,9 +62,9 @@ int check_for_existing_file(int semaphore, char *path,
 		complete_path = change_name(path, SERVER_FOLDER, new_name);
 	}
 	else//file doeesn exit
-		*new_name = NULL;
-
-	
+		*new_name = NULL; //new_name is the buffer that eventually store the 
+						  //new_file_name. in this case, there's no need to 
+						  //change it
 
 	*to_create = fopen(complete_path, "w+");
 	if (*to_create == NULL){
@@ -89,20 +89,24 @@ void server_put_operation(int cmd_sock, int data_sock, char *file_name, int sem_
 	int n;
 	FILE *file_received;
 	char *new_file_name;
-	//controllo se già non esiste, in caso rinominalo es pippo1.txt
+	
+	//file_received will point to an opened stream after this function
+	//it will be opened atomically
 	if (check_for_existing_file(sem_id,
 				file_name,
 				&file_received,
 				&new_file_name) < 0){
-		exit(EXIT_FAILURE);	
+		exit(EXIT_FAILURE); 	
 	}
-
 
 	Message ack, *m;
 	int flag = ACK;
-	if (new_file_name != NULL)
+	//new file name is NULL if name has not been changed. then, if it is not
+	//NULL, server will send to client the name 
+	if (new_file_name != NULL) 
 		flag = flag | CHAR_INDICATOR;
 
+	//check for new_file_name is done in the function
 	make_packet(&ack, new_file_name, 0, 0, flag);
 	
 	if (new_file_name != NULL)
@@ -112,32 +116,10 @@ void server_put_operation(int cmd_sock, int data_sock, char *file_name, int sem_
 		send_packet(cmd_sock, &ack, NULL);
 	check_last_ack(cmd_sock, cmd_sock, &ack);
 
-	/*struct timeval to;
-	to.tv_sec = (Tsec) << 2;
-	to.tv_usec = (Tnsec / 1000) << 2;
-	while(1) {
-		if (!is_packet_lost())
-			send_packet(cmd_sock, &ack, NULL);
-		
-		setsockopt(cmd_sock, SOL_SOCKET, SO_RCVTIMEO, &to, sizeof(to));
-		m = receive_packet(cmd_sock, NULL);
-		if (m == NULL){
-			if (errno != EAGAIN){
-				perror("error in new receive packet lsot");
-				exit(EXIT_FAILURE);
-			}
-			else{
-				break; //timeout, client has read err mex
-			}
-		}
-		else
-			free(m);
-	}
-	to.tv_sec = 0;
-	to.tv_usec = 0;
-	setsockopt(cmd_sock, SOL_SOCKET, SO_RCVTIMEO, &to, sizeof(to));*/
-
+	//waiting for file bytes
 	receive_data(data_sock, cmd_sock, file_received, NULL);
+
+	//closing the stream
 	if (fclose(file_received) == EOF){
 		perror("error closing file in put");
 		exit(EXIT_FAILURE);
@@ -158,42 +140,15 @@ void server_get_operation(int cmd_sock, int data_sock, char *file_requested){
 	memset((void*) complete_path, 0, len);
 	sprintf(complete_path, "%s%s", SERVER_FOLDER, file_requested);
 	
-	//verifico se il file esiste effettivamente
+	//check for existing file with file requested
 	if(access(complete_path, F_OK) == -1){
-		if (errno == ENOENT){
+		if (errno == ENOENT){ //file doesnt exist
 			//send error message
 			make_packet(&mex, NULL, 0, 0, ACK | FILE_NOT_FOUND);
 			Message *m;
 			if (!is_packet_lost())
 				send_packet(cmd_sock, &mex, NULL);
 			check_last_ack(cmd_sock, cmd_sock, &mex);
-
-			/*struct timeval to;
-			to.tv_sec = (Tsec) << 2;
-			to.tv_usec = (Tnsec / 1000) << 2;
-
-			while(1) {
-				if (!is_packet_lost())
-					send_packet(cmd_sock, &mex, NULL);
-				
-				setsockopt(cmd_sock, SOL_SOCKET, SO_RCVTIMEO, &to, sizeof(to));
-				m = receive_packet(cmd_sock, NULL);
-				if (m == NULL){
-					if (errno != EAGAIN){
-						perror("error in new receive packet lsot");
-						exit(EXIT_FAILURE);
-					}
-					else{
-						break; //timeout, client has read err mex
-					}
-	
-				}
-				else
-					free(m);
-			}
-			to.tv_sec = 0;
-			to.tv_usec = 0;
-			setsockopt(cmd_sock, SOL_SOCKET, SO_RCVTIMEO, &to, sizeof(to));*/
 			return;
 		}
 		else{
@@ -209,14 +164,12 @@ void server_get_operation(int cmd_sock, int data_sock, char *file_requested){
 			send_packet(cmd_sock, &mex, NULL);
 	}
 
-	//apro file
+	//open file, sending it, and close it
 	FILE *file_to_send;
 	file_to_send = fopen(complete_path, "rb"); 
 
-	if (send_data(data_sock, cmd_sock, file_to_send, 0, NULL) < 0){
-		perror("errore in sendto");
-		exit(EXIT_FAILURE);
-	}
+	send_data(data_sock, cmd_sock, file_to_send, 0, NULL);
+
 	if (fclose(file_to_send) == EOF){
 		perror("error closing file in get");
 		exit(EXIT_FAILURE);
@@ -237,14 +190,16 @@ char *make_file_list(){
 		exit(EXIT_FAILURE);
 	}
 
+	//readdir(dir) return NULL if there are no more files
 	while ( (file_info = readdir(dir)) != NULL){
+		//excluding .. and . 
 		if ( strcmp(file_info -> d_name, "..") == 0  || 
 				strcmp(file_info -> d_name, ".") == 0) 
 			continue; 
 
 		curr_name_len = strlen(file_info -> d_name);
 
-		old_len = len; //that's the offset
+		old_len = len; //that's the offset where store new file-name
 		len += curr_name_len;
 		len++; //space beetwen names
 		
@@ -253,16 +208,16 @@ char *make_file_list(){
 			perror("error in realloc");
 			exit(EXIT_FAILURE);
 		}
+		//note there is a space after each name
 		sprintf(file_list + old_len, "%s ", file_info -> d_name );
 		*(file_list + len) = '\0';
-
 	}
 
 	if (closedir(dir) < 0){
 		perror("error closing dir"); 
 		exit(EXIT_FAILURE);
 	}
-	return file_list;
+	return file_list; //this will be freed after sent
 
 }
 

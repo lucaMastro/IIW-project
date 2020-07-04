@@ -1,11 +1,14 @@
 
-
 void send_syn(int sockfd, char *ip, int *new_ports){
 	struct sockaddr_in server_listen_addr;
 	Message syn, *syn_ack;
-	char *tmp, data[12];
+	char *tmp, data[12]; //12 is max size of syn-ack:
+						 //num port <= 2^16 = 65536
+						 //2*5 + 1 space + '\0'
+
 	int cmd_port, data_port;
 
+	//making server list address
 	memset((void*) &server_listen_addr, 0, sizeof(server_listen_addr));
 	server_listen_addr.sin_family = AF_INET;
 	server_listen_addr.sin_port = (htons(SERV_PORT));
@@ -14,13 +17,16 @@ void send_syn(int sockfd, char *ip, int *new_ports){
 		exit(EXIT_FAILURE);
 	}
 
+	//connecting and sending syn
 	connect(sockfd, (struct sockaddr*)&server_listen_addr,
 			sizeof(server_listen_addr) );
 
 	memset((void*)data, 0, 12);
+	//last param of send_data isnt null, then if ack has length > 0, the 
+	//data will be stored in that param
 	send_data(sockfd, sockfd, NULL, SYN, data);
-	printf("data %s\n", data);
 
+	//parsing the data for port numbers
 	tmp = strtok(data, " ");
 	cmd_port = atoi(tmp);
 
@@ -29,7 +35,6 @@ void send_syn(int sockfd, char *ip, int *new_ports){
 	
 	new_ports[0] = cmd_port;
 	new_ports[1] = data_port;
-
 }
 
 
@@ -41,6 +46,7 @@ void make_connection(int sockfd, char *ip, int *cmd_sock, int *data_sock){
 
 	send_syn(sockfd, ip, new_ports);
 	
+	//making server thread addresses
 	memset((void*)&cmd_server_addr, 0, sizeof(cmd_server_addr));
 	cmd_server_addr.sin_family = AF_INET;
 	cmd_server_addr.sin_port = htons(new_ports[0]);
@@ -57,9 +63,9 @@ void make_connection(int sockfd, char *ip, int *cmd_sock, int *data_sock){
 		exit(EXIT_FAILURE);
 	}
 
-
 	make_packet(&ack, NULL, 0, 0, ACK);
-	
+
+	//connect new sockets and sending ack on both
 	if (connect_retry(*cmd_sock, &cmd_server_addr, 
 				sizeof(cmd_server_addr), &ack) < 0){
 		printf("connection refused on cmd sock.\n");

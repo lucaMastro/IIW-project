@@ -1,14 +1,5 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <errno.h>
-#include <string.h>
-
-//#include "../readwrite/read-write.h"
 
 #define CLIENT_FOLDER "client-files/"
-
-extern int h_errno;
 
 void client_put_operation(int cmd_sock, int data_sock, char *file_to_send,
 		char *server_name){
@@ -44,10 +35,7 @@ void client_put_operation(int cmd_sock, int data_sock, char *file_to_send,
 	FILE *segment_file_transfert;
 	segment_file_transfert = fopen(complete_path, "rb");					
 
-	if (send_data(data_sock, cmd_sock, segment_file_transfert, 0, NULL) < 0){
-		perror("errore in sendto");
-		exit(1);
-	}
+	send_data(data_sock, cmd_sock, segment_file_transfert, 0, NULL);
 
 	free(complete_path);
 }
@@ -71,10 +59,11 @@ void client_get_operation(int cmd_sock, int data_sock, char *file_to_get,
 	sprintf(complete_path, "%s%s", CLIENT_FOLDER, local_name);
 
 	if (send_read_cmd(cmd_sock, data_sock, GET | CHAR_INDICATOR, 
-				file_to_get) < 0)
+				file_to_get) < 0) //file doesnt exist server-side
 		return;
 
-	//controllo se non è già presente nel client
+
+	// check for file in local
 	if ((ret_access = access(complete_path, F_OK)) == -1 &&
 		errno != ENOENT){
 			perror("error in access");
@@ -83,6 +72,8 @@ void client_get_operation(int cmd_sock, int data_sock, char *file_to_get,
 	
 	else if (ret_access == 0){ //the file still exist
 		printf("file still exist\n");
+		//freeding the path and creating a new path:
+		// <folder>/<name>(1).<ext>
 		free(complete_path);
 		complete_path = change_name(local_name, CLIENT_FOLDER, NULL);
 		printf("it will be saved as %s\n", complete_path);
@@ -100,25 +91,18 @@ void client_get_operation(int cmd_sock, int data_sock, char *file_to_get,
 
 	fclose(new_file);
 	free(complete_path);
-	//leggere exit code, se fallisce elimina file
 }
 
 
 
 void client_list_operation(int cmd_sock, int data_sock){
 
-	/*Message list_mex, *ack = NULL;
-	make_packet(&list_mex, NULL, 0, 0, LIST);
-
-
-	send_data(data_sock, cmd_sock, NULL, LIST, NULL);
-*/
 	send_read_cmd(cmd_sock, data_sock, LIST, NULL);
 	unsigned char *list = NULL;
 	receive_data(data_sock, cmd_sock, &list, NULL );
-	//stampo contenuto
-	 printf("%s\n", list);
-	 free(list);
+	//printing list content
+	printf("%s\n", list);
+	free(list);
 }
 
 

@@ -1,5 +1,5 @@
-default: compile
-adaptive: compile-adaptive
+default: compile-adaptive
+static: compile
 
 compile: 
 	gcc -o server src/server/server-side.c -pthread -lrt

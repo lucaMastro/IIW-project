@@ -52,7 +52,7 @@ ssize_t writen(int fd, ssize_t n, struct sockaddr_in *to,
 		unsigned char *buff);
 void *make_packet(Message *mess_to_fill, void *read_data_from_here, 
 		int seq_num, int ack_num, int flag_to_set);
-ssize_t send_data(int connected_fd, int cmd_sock, void *data, int type, 
+void send_data(int connected_fd, int cmd_sock, void *data, int type, 
 		char *read_from_ack);
 void receive_data(int data_sock, int cmd_sock, void *write_here,
 		int *save_here_flag);
@@ -61,6 +61,7 @@ void write_data(Message *mex, void *dest, unsigned char *src, int *str_len,
 void send_packet(int sockfd, Message *mex, struct sockaddr_in *to);
 int is_command_mex(Message *mex);
 Message *receive_packet(int sockfd, struct sockaddr_in *from);
+void check_last_ack(int cmd_sock, int data_sock, Message *ack);
 
 //deserialize
 unsigned char *deserialize_seq_num(Message *mex, unsigned char *buffer);
